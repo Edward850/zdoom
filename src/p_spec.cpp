@@ -282,6 +282,48 @@ bool P_ActivateLine (line_t *line, AActor *mo, int side, int activationType)
 
 //============================================================================
 //
+// P_PredictLine
+// 
+//============================================================================
+
+bool P_PredictLine(line_t *line, AActor *mo, int side, int activationType)
+{
+	// [Edward850] We only want specifc lines to be predicted.
+	// For now, it's most teleport lines (not the group ones), however more could be added later
+
+	if (line->special != 70 && // LS_Teleport
+		line->special != 71 && // LS_Teleport_NoFog
+		line->special != 154 && // LS_Teleport_NoStop
+		line->special != 215) // LS_Teleport_Line
+	{
+		return false;
+	}
+
+	INTBOOL buttonSuccess;
+
+	if (!P_TestActivateLine(line, mo, side, activationType))
+	{
+		return false;
+	}
+
+	bool remote = (line->special != 7 && line->special != 8 && (line->special < 11 || line->special > 14));
+	if (line->locknumber > 0 && !P_CheckKeys(mo, line->locknumber, remote)) return false;
+	
+	buttonSuccess = false;
+	buttonSuccess = P_ExecuteSpecial(line->special,
+		line, mo, side == 1, line->args[0],
+		line->args[1], line->args[2],
+		line->args[3], line->args[4]);
+
+	if (developer && buttonSuccess)
+	{
+		Printf("Line special %d predicted on line %i\n", line->special, int(line - lines));
+	}
+	return true;
+}
+
+//============================================================================
+//
 // P_TestActivateLine
 //
 //============================================================================

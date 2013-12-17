@@ -56,6 +56,7 @@
 CVAR (Bool, cl_bloodsplats, true, CVAR_ARCHIVE)
 CVAR (Int, sv_smartaim, 0, CVAR_ARCHIVE|CVAR_SERVERINFO)
 CVAR (Bool, cl_doautoaim, false, CVAR_ARCHIVE)
+CVAR (Bool, cl_noprediction_lines, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 static void CheckForPushSpecial (line_t *line, int side, AActor *mobj, bool windowcheck);
 static void SpawnShootDecal (AActor *t1, const FTraceResults &trace);
@@ -380,6 +381,9 @@ bool P_TeleportMove (AActor *thing, fixed_t x, fixed_t y, fixed_t z, bool telefr
 		// ... and some items can never be telefragged while others will be telefragged by everything that teleports upon them.
 		if ((StompAlwaysFrags && !(th->flags6 & MF6_NOTELEFRAG)) || (th->flags7 & MF7_ALWAYSTELEFRAG))
 		{
+			if (thing->player && (thing->player->cheats & CF_PREDICTING))
+				continue; // Just pretend to telefrag. We otherwise don't want to just yet.
+			
 			P_DamageMobj (th, thing, thing, TELEFRAG_DAMAGE, NAME_Telefrag, DMG_THRUSTLESS);
 			continue;
 		}
@@ -1966,7 +1970,7 @@ bool P_TryMove (AActor *thing, fixed_t x, fixed_t y,
 	}
 
 	// [RH] Don't activate anything if just predicting
-	if (thing->player && (thing->player->cheats & CF_PREDICTING))
+	if (thing->player && (thing->player->cheats & CF_PREDICTING) && cl_noprediction_lines)
 	{
 		thing->flags6 &= ~MF6_INTRYMOVE;
 		return true;
@@ -1982,7 +1986,11 @@ bool P_TryMove (AActor *thing, fixed_t x, fixed_t y,
 			oldside = P_PointOnLineSide (oldx, oldy, ld);
 			if (side != oldside && ld->special && !(thing->flags6 & MF6_NOTRIGGER))
 			{
-				if (thing->player)
+				if (thing->player && (thing->player->cheats & CF_PREDICTING))
+				{
+					P_PredictLine (ld, thing, oldside, SPAC_Cross);
+				}
+				else if (thing->player)
 				{
 					P_ActivateLine (ld, thing, oldside, SPAC_Cross);
 				}
@@ -2006,6 +2014,13 @@ bool P_TryMove (AActor *thing, fixed_t x, fixed_t y,
 				}
 			}
 		}
+	}
+
+	// [Ed850] That's it. No more predicting.
+	if (thing->player && (thing->player->cheats & CF_PREDICTING))
+	{
+		thing->flags6 &= ~MF6_INTRYMOVE;
+		return true;
 	}
 
 	// [RH] Check for crossing fake floor/ceiling

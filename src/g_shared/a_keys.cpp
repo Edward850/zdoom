@@ -425,7 +425,7 @@ bool P_CheckKeys (AActor *owner, int keynum, bool remote)
 
 	// If we get here, that means the actor isn't holding an appropriate key.
 
-	if (owner == players[consoleplayer].camera)
+	if (owner == players[consoleplayer].camera && !(owner->player->cheats & CF_PREDICTING))
 	{
 		PrintMessage(failtext);
 

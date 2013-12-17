@@ -180,26 +180,33 @@ bool P_Teleport (AActor *thing, fixed_t x, fixed_t y, fixed_t z, angle_t angle,
 	{
 		angle = thing->angle;
 	}
-	// Spawn teleport fog at source and destination
-	if (sourceFog)
+	// Spawn teleport fog at source and destination (with player prediction isolation)
+	if (thing->player == NULL || !(thing->player->cheats & CF_PREDICTING))
 	{
-		fixed_t fogDelta = thing->flags & MF_MISSILE ? 0 : TELEFOGHEIGHT;
-		AActor *fog = Spawn<ATeleportFog> (oldx, oldy, oldz + fogDelta, ALLOW_REPLACE);
-		fog->target = thing;
+		if (sourceFog)
+		{
+			fixed_t fogDelta = thing->flags & MF_MISSILE ? 0 : TELEFOGHEIGHT;
+			AActor *fog = Spawn<ATeleportFog>(oldx, oldy, oldz + fogDelta, ALLOW_REPLACE);
+			fog->target = thing;
+		}
+		if (useFog)
+		{
+			fixed_t fogDelta = thing->flags & MF_MISSILE ? 0 : TELEFOGHEIGHT;
+			an = angle >> ANGLETOFINESHIFT;
+			AActor *fog = Spawn<ATeleportFog>(x + 20 * finecosine[an],
+				y + 20 * finesine[an], thing->z + fogDelta, ALLOW_REPLACE);
+			fog->target = thing;
+		}
 	}
+	// [Edward850] We still want to add FOV to teleport prediction, so that code has been moved here
 	if (useFog)
 	{
-		fixed_t fogDelta = thing->flags & MF_MISSILE ? 0 : TELEFOGHEIGHT;
-		an = angle >> ANGLETOFINESHIFT;
-		AActor *fog = Spawn<ATeleportFog> (x + 20*finecosine[an],
-			y + 20*finesine[an], thing->z + fogDelta, ALLOW_REPLACE);
-		fog->target = thing;
 		if (thing->player)
 		{
 			// [RH] Zoom player's field of vision
 			// [BC] && bHaltVelocity.
 			if (telezoom && thing->player->mo == thing && bHaltVelocity)
-				thing->player->FOV = MIN (175.f, thing->player->DesiredFOV + 45.f);
+				thing->player->FOV = MIN(175.f, thing->player->DesiredFOV + 45.f);
 		}
 	}
 	// [BC] && bHaltVelocity.
