@@ -206,7 +206,7 @@ void FTeam::ParseTeamDefinition (FScanner &Scan)
 
 		case TEAMINFO_FlagItem:
 			Scan.MustGetString ();
-			Team.f_Thing = Scan.String;
+			Team.f_FlagName = Scan.String;
 			break;
 
 		case TEAMINFO_RailColor:
