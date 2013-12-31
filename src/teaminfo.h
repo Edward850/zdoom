@@ -47,6 +47,7 @@ public:
 	FTeam ();
 	void ParseTeamInfo ();
 	bool IsValidTeam (unsigned int uiTeam);
+	bool isValidCTFTeam () const;
 
 	const char *GetName () const;
 	int GetPlayerColor () const;
@@ -58,6 +59,14 @@ public:
 	int			m_iScore;
 	int			m_iPresent;
 	int			m_iTies;
+	int			m_TeamStartId;
+
+	//CTF Info
+	int			f_ReturnTic;
+	player_t	*f_Carrier;
+	fixed_t		f_flagx, f_flagy, f_flagz;
+	bool		f_Taken;
+	FString		f_FlagName;
 
 private:
 	void ParseTeamDefinition (FScanner &Scan);

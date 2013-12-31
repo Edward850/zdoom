@@ -201,10 +201,15 @@ void FTeam::ParseTeamDefinition (FScanner &Scan)
 
 		case TEAMINFO_PlayerStartThingNumber:
 			Scan.MustGetNumber ();
+			Team.m_TeamStartId = Scan.Number;
+			break;
+
+		case TEAMINFO_FlagItem:
+			Scan.MustGetString ();
+			Team.f_Thing = Scan.String;
 			break;
 
 		case TEAMINFO_RailColor:
-		case TEAMINFO_FlagItem:
 		case TEAMINFO_SkullItem:
 		case TEAMINFO_SmallFlagHUDIcon:
 		case TEAMINFO_SmallSkullHUDIcon:
@@ -246,6 +251,20 @@ void FTeam::ClearTeams ()
 bool FTeam::IsValidTeam (unsigned int uiTeam)
 {
 	if (uiTeam >= Teams.Size ())
+		return false;
+
+	return true;
+}
+
+//==========================================================================
+//
+// FTeam :: IsValidCTFTeam
+//
+//==========================================================================
+
+bool FTeam::isValidCTFTeam () const
+{
+	if (f_FlagName == NULL)
 		return false;
 
 	return true;
