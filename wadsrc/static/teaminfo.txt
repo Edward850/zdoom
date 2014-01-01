@@ -4,7 +4,7 @@ Team "Blue"
 {
 	PlayerColor "00 00 FF"
 	TextColor "Blue"
-	PlayerStartThingNumber = 5080
+	PlayerStartThingNumber 5080
 	FlagItem "BlueFlag"
 }
 
@@ -12,7 +12,7 @@ Team "Red"
 {
 	PlayerColor "FF 00 00"
 	TextColor "Red"
-	PlayerStartThingNumber = 5081
+	PlayerStartThingNumber 5081
 	FlagItem "RedFlag"
 }
 
@@ -20,40 +20,40 @@ Team "Green"
 {
 	PlayerColor "00 FF 00"
 	TextColor "Green"
-	PlayerStartThingNumber = 5083 //5082 is skipped
+	PlayerStartThingNumber 5083 //5082 is skipped
 }
 
 Team "Gold"
 {
 	PlayerColor "FF FF 00"
 	TextColor "Gold"
-	PlayerStartThingNumber = 5084
+	PlayerStartThingNumber 5084
 }
 
 Team "Black"
 {
 	PlayerColor "00 00 00"
 	TextColor "Black"
-	PlayerStartThingNumber = 5085
+	PlayerStartThingNumber 5085
 }
 
 Team "White"
 {
 	PlayerColor "FF FF FF"
 	TextColor "White"
-	PlayerStartThingNumber = 5086
+	PlayerStartThingNumber 5086
 }
 
 Team "Orange"
 {
 	PlayerColor "FF 80 00"
 	TextColor "Orange"
-	PlayerStartThingNumber = 5087
+	PlayerStartThingNumber 5087
 }
 
 Team "Purple"
 {
 	PlayerColor "FF 00 FF"
 	TextColor "Purple"
-	PlayerStartThingNumber = 5088
+	PlayerStartThingNumber 5088
 }

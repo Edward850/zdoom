@@ -62,10 +62,6 @@ public:
 	int			m_TeamStartId;
 
 	//CTF Info
-	int			f_ReturnTic;
-	player_t	*f_Carrier;
-	fixed_t		f_flagx, f_flagy, f_flagz;
-	bool		f_Taken;
 	FString		f_FlagName;
 
 private:
