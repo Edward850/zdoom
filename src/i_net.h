@@ -27,4 +27,13 @@
 bool I_InitNetwork (void);
 void I_NetCmd (void);
 
+void Start_HostGame(void);
+void Wait_HostGame(void);
+void Go_HostGame(void);
+
+void Start_JoinGame(const char *name);
+void WaitHost_JoinGame(void);
+void WaitOthers_JoinGame(void);
+void Go_JoinGame(void);
+
 #endif

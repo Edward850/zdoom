@@ -474,7 +474,7 @@ void SendAbort (void)
 	}
 }
 
-static void SendConAck (int num_connected, int num_needed)
+static void SendConAck (int num_connected, int num_needed, bool update = true)
 {
 	PreGamePacket packet;
 
@@ -486,7 +486,8 @@ static void SendConAck (int num_connected, int num_needed)
 	{
 		PreSend (&packet, 4, &sendaddress[node]);
 	}
-	StartScreen->NetProgress (doomcom.numnodes);
+	if (update)
+		StartScreen->NetProgress (doomcom.numnodes);
 }
 
 bool Host_CheckForConnects (void *userdata)
@@ -642,6 +643,8 @@ bool Host_SendAllHere (void *userdata)
 	return gotack[MAXNETNODES] == doomcom.numnodes - 1;
 }
 
+
+
 void HostGame (int i)
 {
 	PreGamePacket packet;
@@ -719,6 +722,158 @@ void HostGame (int i)
 	{
 		sendplayer[i] = i;
 	}
+}
+
+void Start_HostGame()
+{
+	StartNetwork(false);
+
+	doomcom.consoleplayer = 0;
+	Printf("Console player number: %d\n", doomcom.consoleplayer);
+	doomcom.numnodes = 1;
+	Printf("Waiting for players\n", netHandshake.players);
+
+	netHandshake.state = NHS_WAITING;
+
+	// Start wait now.
+	Wait_HostGame();
+}
+
+void Wait_HostGame()
+{
+	PreGamePacket packet;
+	int numplayers = netHandshake.players;
+	sockaddr_in *from;
+	int node;
+
+	while ((from = PreGet(&packet, sizeof(packet), false)))
+	{
+		if (packet.Fake != PRE_FAKE)
+		{
+			continue;
+		}
+		switch (packet.Message)
+		{
+		case PRE_CONNECT:
+			node = FindNode(from);
+			if (doomcom.numnodes == numplayers)
+			{
+				if (node == -1)
+				{
+					const BYTE *s_addr_bytes = (const BYTE *)&from->sin_addr;
+					Printf("Got extra connect from %d.%d.%d.%d:%d\n",
+						s_addr_bytes[0], s_addr_bytes[1], s_addr_bytes[2], s_addr_bytes[3],
+						from->sin_port);
+					packet.Message = PRE_ALLFULL;
+					PreSend(&packet, 2, from);
+				}
+			}
+			else
+			{
+				if (node == -1)
+				{
+					node = doomcom.numnodes++;
+					sendaddress[node] = *from;
+					Printf("Got connect from node %d.\n", node);
+				}
+
+				// Let the new guest (and everyone else) know we got their message.
+				SendConAck(doomcom.numnodes, numplayers, false);
+			}
+			break;
+
+		case PRE_DISCONNECT:
+			node = FindNode(from);
+			if (node >= 0)
+			{
+				Printf("Got disconnect from node %d.\n", node);
+				doomcom.numnodes--;
+				while (node < doomcom.numnodes)
+				{
+					sendaddress[node] = sendaddress[node + 1];
+					node++;
+				}
+
+				// Let remaining guests know that somebody left.
+				SendConAck(doomcom.numnodes, numplayers, false);
+			}
+			break;
+		}
+	}
+	if (doomcom.numnodes < numplayers)
+	{
+		return;
+	}
+
+	// It's possible somebody bailed out after all players were found.
+	// Unfortunately, this isn't guaranteed to catch all of them.
+	// Oh well. Better than nothing.
+	while ((from = PreGet(&packet, sizeof(packet), false)))
+	{
+		if (packet.Fake == PRE_FAKE && packet.Message == PRE_DISCONNECT)
+		{
+			node = FindNode(from);
+			if (node >= 0)
+			{
+				doomcom.numnodes--;
+				while (node < doomcom.numnodes)
+				{
+					sendaddress[node] = sendaddress[node + 1];
+					node++;
+				}
+				// Let remaining guests know that somebody left.
+				SendConAck(doomcom.numnodes, numplayers, false);
+			}
+			break;
+		}
+	}
+	netHandshake.players = doomcom.numnodes;
+	netHandshake.state = NHS_GO;
+
+	// Start GO now.
+	Go_HostGame();
+}
+
+void Go_HostGame()
+{
+	PreGamePacket packet;
+	int gotack[MAXNETNODES + 1];
+	int node, i;
+	// Now inform everyone of all machines involved in the game
+	memset(gotack, 0, sizeof(gotack));
+	Printf("Sending all here.\n");
+
+	if(!Host_SendAllHere((void *)gotack))
+	{
+		return;
+	}
+
+	// Now go
+	Printf("Go\n");
+	packet.Fake = PRE_FAKE;
+	packet.Message = PRE_GO;
+	for (node = 1; node < doomcom.numnodes; node++)
+	{
+		// If we send the packets eight times to each guest,
+		// hopefully at least one of them will get through.
+		for (int i = 8; i != 0; --i)
+		{
+			PreSend(&packet, 2, &sendaddress[node]);
+		}
+	}
+
+	Printf("Total players: %d\n", doomcom.numnodes);
+
+	doomcom.id = DOOMCOM_ID;
+	doomcom.numplayers = doomcom.numnodes;
+
+	// On the host, each player's number is the same as its node number
+	for (i = 0; i < doomcom.numnodes; ++i)
+	{
+		sendplayer[i] = i;
+	}
+
+	netHandshake.state = NHS_INITARBITRATE;
 }
 
 // This routine is used by a guest to notify the host of its presence.
@@ -861,6 +1016,128 @@ void JoinGame (int i)
 
 	doomcom.id = DOOMCOM_ID;
 	doomcom.numplayers = doomcom.numnodes;
+}
+
+void Start_JoinGame(const char *name)
+{
+	StartNetwork(true);
+
+	// Host is always node 1
+	BuildAddress(&sendaddress[1], name);
+	sendplayer[1] = 0;
+	doomcom.numnodes = netHandshake.players = 2;
+
+	// Let host know we are here
+	Printf("Contacting host\n");
+
+	netHandshake.state = NHS_JOININGHOST;
+	WaitHost_JoinGame();
+}
+
+void WaitHost_JoinGame()
+{
+	sockaddr_in *from;
+	PreGamePacket packet;
+
+	// Let the host know we are here.
+	packet.Fake = PRE_FAKE;
+	packet.Message = PRE_CONNECT;
+	PreSend(&packet, 2, &sendaddress[1]);
+
+	// Listen for a reply.
+	while ((from = PreGet(&packet, sizeof(packet), true)))
+	{
+		if (packet.Fake == PRE_FAKE && FindNode(from) == 1)
+		{
+			if (packet.Message == PRE_CONACK)
+			{
+				Printf("Connected!\n");
+				Printf("Waiting for other players (have %d of %d)\n", packet.NumPresent, packet.NumNodes);
+				netHandshake.state = NHS_JOININGPLAYERS;
+				WaitOthers_JoinGame();
+				return;
+			}
+			else if (packet.Message == PRE_DISCONNECT)
+			{
+				doomcom.numnodes = 1;
+				Printf("The host cancelled the game.\n");
+				netHandshake.state = NHS_NULL;
+				return;
+			}
+			else if (packet.Message == PRE_ALLFULL)
+			{
+				doomcom.numnodes = 1;
+				Printf("The game is full.\n");
+				netHandshake.state = NHS_NULL;
+				return;
+			}
+		}
+	}
+}
+
+void WaitOthers_JoinGame()
+{
+	sockaddr_in *from;
+	PreGamePacket packet;
+
+	while ((from = PreGet(&packet, sizeof(packet), false)))
+	{
+		if (packet.Fake != PRE_FAKE || FindNode(from) != 1)
+		{
+			continue;
+		}
+		switch (packet.Message)
+		{
+		case PRE_CONACK:
+			// Do nothing
+			break;
+
+		case PRE_ALLHERE:
+			if (doomcom.numnodes == 2)
+			{
+				int node;
+
+				packet.NumNodes = packet.NumNodes;
+				doomcom.numnodes = packet.NumNodes + 2;
+				sendplayer[0] = packet.ConsoleNum;	// My player number
+				doomcom.consoleplayer = packet.ConsoleNum;
+				Printf("Console player number: %d\n", doomcom.consoleplayer);
+				for (node = 0; node < packet.NumNodes; node++)
+				{
+					sendaddress[node + 2].sin_addr.s_addr = packet.machines[node].address;
+					sendaddress[node + 2].sin_port = packet.machines[node].port;
+					sendplayer[node + 2] = packet.machines[node].player;
+
+					// [JC] - fixes problem of games not starting due to
+					// no address family being assigned to nodes stored in
+					// sendaddress[] from the All Here packet.
+					sendaddress[node + 2].sin_family = AF_INET;
+				}
+			}
+
+			Printf("Received All Here, sending ACK.\n");
+			packet.Fake = PRE_FAKE;
+			packet.Message = PRE_ALLHEREACK;
+			PreSend(&packet, 2, &sendaddress[1]);
+			break;
+
+		case PRE_GO:
+			Printf("Received \"Go.\"\n");
+			netHandshake.state = NHS_INITARBITRATE;
+
+			Printf("Total players: %d\n", doomcom.numnodes);
+
+			doomcom.id = DOOMCOM_ID;
+			netHandshake.players = doomcom.numplayers = doomcom.numnodes;
+			return;
+
+		case PRE_DISCONNECT:
+			doomcom.consoleplayer = doomcom.numnodes = 1;
+			Printf("The host cancelled the game.\n");
+			netHandshake.state = NHS_NULL;
+			return;
+		}
+	}
 }
 
 static int PrivateNetOf(in_addr in)

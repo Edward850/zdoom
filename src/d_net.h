@@ -88,6 +88,31 @@ struct doomcom_t
 	
 };
 
+enum handshake
+{
+	NHS_NULL,
+	NHS_WAITING,		// Waiting for players (hosting)
+	NHS_JOININGHOST,	// Joining a game
+	NHS_JOININGPLAYERS,	// Waiting for other players (joining)
+	NHS_GO,				// Send 'GO'
+	NHS_INITARBITRATE,
+	NHS_LOOPARBITRATE,
+	NHS_SPAWN			// Start the game
+};
+
+struct ArbitrateData
+{
+	DWORD playersdetected[MAXNETNODES];
+	BYTE  gotsetup[MAXNETNODES];
+};
+
+struct netHStruct
+{
+	ArbitrateData	data;
+	handshake		state = NHS_NULL;
+	int				players;
+};
+extern netHStruct netHandshake;
 
 class FDynamicBuffer
 {

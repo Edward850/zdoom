@@ -121,6 +121,7 @@ int 			ticdup;
 void D_ProcessEvents (void); 
 void G_BuildTiccmd (ticcmd_t *cmd); 
 void D_DoAdvanceDemo (void);
+void DoNetworkHandshake(void);
 
 static void SendSetup (DWORD playersdetected[MAXNETNODES], BYTE gotsetup[MAXNETNODES], int len);
 static void RunScript(BYTE **stream, APlayerPawn *pawn, int snum, int argn, int always);
@@ -138,6 +139,9 @@ static int	oldentertics;
 
 extern	bool	 advancedemo;
 
+netHStruct netHandshake;
+
+
 CUSTOM_CVAR (Bool, cl_capfps, false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 {
 	// Do not use the separate FPS limit timer if we are limiting FPS with this.
@@ -149,6 +153,52 @@ CUSTOM_CVAR (Bool, cl_capfps, false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 	{
 		I_SetFPSLimit(-1);
 	}
+}
+
+CCMD (Host)
+{
+	if (argv.argc() < 2)
+	{
+		Printf("Usage: Host <number of players>\n");
+		return;
+	}
+	else if (atoi(argv[1]) < 2)
+	{
+		Printf("Cannot host a network game with just one player\n");
+		return;
+	}
+	else if (netHandshake.state == NHS_NULL && !netgame)
+	{
+		netHandshake.players = atoi(argv[1]);
+		NetMode = NET_PeerToPeer; // For now, only allow P2P.
+
+		if (doomcom.id != DOOMCOM_ID)
+		{
+			I_FatalError("Doomcom buffer invalid!");
+		}
+
+		Start_HostGame();
+		return;
+	}
+	else
+		Printf("A netgame or handshake is already in progress. Please end it first.\n");
+}
+
+CCMD(Join)
+{
+	if (argv.argc() < 2)
+	{
+		Printf("Usage: Join <IP address or hostname>\n");
+		return;
+	}
+	else if (netHandshake.state == NHS_NULL && !netgame)
+	{
+		Start_JoinGame(argv[1]);
+
+		return;
+	}
+	else
+		Printf("A netgame or handshake is already in progress. Please end it first.\n");
 }
 
 // [RH] Special "ticcmds" get stored in here
@@ -504,7 +554,7 @@ bool HGetPacket (void)
 		return true;
 	}
 
-	if (!netgame)
+	if (!netgame || (netHandshake.state != NHS_NULL && netHandshake.state != NHS_LOOPARBITRATE))
 		return false;
 
 	if (demoplayback)
@@ -924,6 +974,9 @@ void NetUpdate (void)
 
 	GC::CheckGC();
 
+	// If we are handshaking a network game, this loops it, but only check every second
+	DoNetworkHandshake();
+
 	if (ticdup == 0)
 	{
 		return;
@@ -1306,12 +1359,6 @@ void NetUpdate (void)
 // Negotiation is done when all the guests have reported to the host that
 // they know about the other nodes.
 
-struct ArbitrateData
-{
-	DWORD playersdetected[MAXNETNODES];
-	BYTE  gotsetup[MAXNETNODES];
-};
-
 bool DoArbitrate (void *userdata)
 {
 	ArbitrateData *data = (ArbitrateData *)userdata;
@@ -1364,7 +1411,7 @@ bool DoArbitrate (void *userdata)
 
 				data->playersdetected[0] |= 1 << netbuffer[1];
 
-				StartScreen->NetMessage ("Found %s (node %d, player %d)",
+				Printf ("Found %s (node %d, player %d)\n",
 						players[netbuffer[1]].userinfo.GetName(),
 						node, netbuffer[1]+1);
 			}
@@ -1534,6 +1581,111 @@ void D_ArbitrateNetStart (void)
 		}
 	}
 	StartScreen->NetDone();
+}
+
+void D_InitArbitrate (void)
+{
+	int i;
+
+	players[0].settings_controller = true;
+	consoleplayer = doomcom.consoleplayer;
+
+	D_SetupUserInfo();
+
+	// Return right away if we're just playing with ourselves.
+	if (doomcom.numnodes == 1)
+		return;
+
+	autostart = true;
+
+	memset(netHandshake.data.playersdetected, 0, sizeof(netHandshake.data.playersdetected));
+	memset(netHandshake.data.gotsetup, 0, sizeof(netHandshake.data.gotsetup));
+
+	// The arbitrator knows about himself, but the other players must
+	// be told about themselves, in case the host had to adjust their
+	// userinfo (e.g. assign them to a different team).
+	if (consoleplayer == Net_Arbitrator)
+	{
+		netHandshake.data.playersdetected[0] = 1 << consoleplayer;
+	}
+
+	// Assign nodes to players. The local player is always node 0.
+	// If the local player is not the host, then the host is node 1.
+	// Any remaining players are assigned node numbers in the order
+	// they were detected.
+	playerfornode[0] = consoleplayer;
+	nodeforplayer[consoleplayer] = 0;
+	if (consoleplayer == Net_Arbitrator)
+	{
+		for (i = 1; i < doomcom.numnodes; ++i)
+		{
+			playerfornode[i] = i;
+			nodeforplayer[i] = i;
+		}
+	}
+	else
+	{
+		playerfornode[1] = 0;
+		nodeforplayer[0] = 1;
+		for (i = 1; i < doomcom.numnodes; ++i)
+		{
+			if (i < consoleplayer)
+			{
+				playerfornode[i + 1] = i;
+				nodeforplayer[i] = i + 1;
+			}
+			else if (i > consoleplayer)
+			{
+				playerfornode[i] = i;
+				nodeforplayer[i] = i;
+			}
+		}
+	}
+
+	if (consoleplayer == Net_Arbitrator)
+	{
+		netHandshake.data.gotsetup[0] = 0x80;
+	}
+
+	netHandshake.state = NHS_LOOPARBITRATE;
+}
+
+void D_SpawnNewNetgame(void)
+{
+	int i;
+	if (consoleplayer == Net_Arbitrator)
+	{
+		netbuffer[0] = NCMD_SETUP + 3;
+		SendSetup(netHandshake.data.playersdetected, netHandshake.data.gotsetup, 1);
+	}
+
+	if (debugfile)
+	{
+		for (i = 0; i < doomcom.numnodes; ++i)
+		{
+			fprintf(debugfile, "player %d is on node %d\n", i, nodeforplayer[i]);
+		}
+	}
+
+	Net_ClearBuffers();
+
+	ticdup = doomcom.ticdup;
+
+	for (i = 0; i < doomcom.numplayers; i++)
+		playeringame[i] = true;
+	for (i = 0; i < doomcom.numnodes; i++)
+		nodeingame[i] = true;
+
+	Printf("player %i of %i (%i nodes)\n",
+		consoleplayer + 1, doomcom.numplayers, doomcom.numnodes);
+
+	netHandshake.state = NHS_NULL; // We have finished
+	gamestate = GS_STARTUP;
+
+	CheckWarpTransMap(startmap, true);
+	if (demorecording)
+		G_BeginRecording(startmap);
+	G_InitNew(startmap, false);
 }
 
 static void SendSetup (DWORD playersdetected[MAXNETNODES], BYTE gotsetup[MAXNETNODES], int len)
@@ -2834,6 +2986,53 @@ CCMD (net_listcontrollers)
 		if (players[i].settings_controller)
 		{
 			Printf ("- %s\n", players[i].userinfo.GetName());
+		}
+	}
+}
+
+//==========================================================================
+//
+// Run / check Network handshake
+//
+//==========================================================================
+
+int repeattime = 0;
+void DoNetworkHandshake(void)
+{
+	if (I_GetTime(false) - repeattime >= TICRATE)
+	{	// We don't want to check this all the time, otherwise we will end up flooding other nodes with packets
+		repeattime = I_GetTime(false); //Bump the count
+
+		switch (netHandshake.state)
+		{
+		case NHS_NULL: break; // Do nothing
+		case NHS_WAITING: Wait_HostGame(); break;
+		case NHS_GO: Go_HostGame(); break;
+		case NHS_INITARBITRATE: 
+			D_InitArbitrate();
+			// [ED850] The moment we call D_InitArbitrate, the game state is no longer stable. For now, this will be are locking call
+			while (!DoArbitrate(&netHandshake.data))
+			{
+				while (!(I_GetTime(false) - repeattime >= TICRATE))
+				{
+					// Do nothing
+				}
+				repeattime = I_GetTime(false); //Bump the count
+			}
+			D_SpawnNewNetgame();
+			break;
+/*		case NHS_LOOPARBITRATE: 
+			if (DoArbitrate(&netHandshake.data))
+			{
+				//netHandshake.state = NHS_SPAWN;
+				D_SpawnNewNetgame(); //Do this now, or we may have to wait a second to do it later
+			}
+			break;*/
+		/*case NHS_SPAWN:
+			D_SpawnNewNetgame();
+			break;*/
+		case NHS_JOININGHOST: WaitHost_JoinGame(); break;
+		case NHS_JOININGPLAYERS: WaitOthers_JoinGame(); break;
 		}
 	}
 }
