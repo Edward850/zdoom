@@ -141,7 +141,7 @@ void D_QuitNetGame (void);
 void TryRunTics (void);
 
 //Use for checking to see if the netgame has stalled
-void Net_CheckLastRecieved(int);
+void Net_CheckLastRecieved(int, int);
 
 // [RH] Functions for making and using special "ticcmds"
 void Net_NewMakeTic ();
