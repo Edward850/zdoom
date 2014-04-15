@@ -281,6 +281,19 @@ ListMenu "SaveGameMenu"
 
 //-------------------------------------------------------------------------------------------
 //
+// Base definition for the net lobby. Only the configurable part is done here
+//
+//-------------------------------------------------------------------------------------------
+
+ListMenu "Netgamelobby"
+{
+	StaticTextCentered 160, -10, "Netgame lobby"
+	Position 80,54
+	Class "Netgamelobby"	// uses its own implementation
+}
+
+//-------------------------------------------------------------------------------------------
+//
 // The option menu
 //
 //-------------------------------------------------------------------------------------------

@@ -505,6 +505,7 @@ xx(Optionsmenu)
 xx(Quitmenu)
 xx(Savemenu)
 xx(Playermenu)
+xx(Netgamelobby)
 
 xx(Playerbox)
 xx(Team)

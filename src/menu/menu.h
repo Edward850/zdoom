@@ -66,6 +66,18 @@ struct FSaveGameNode
 	FSaveGameNode() { bNoDelete = false; }
 };
 
+struct FPlayerNode
+{
+	FString name;
+	bool host;
+
+	FPlayerNode()
+	{
+		host = false;
+		name = "IAMANULLNODE";
+	}
+};
+
 
 
 //=============================================================================
@@ -678,6 +690,7 @@ void M_StartMessage(const char *message, int messagemode, FName action = NAME_No
 DMenu *StartPickerMenu(DMenu *parent, const char *name, FColorCVar *cvar);
 void M_RefreshModesList ();
 void M_InitVideoModesMenu ();
+void M_NotifyNewPlayer();
 
 
 #endif

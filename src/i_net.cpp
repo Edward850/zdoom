@@ -1054,6 +1054,7 @@ void WaitHost_JoinGame()
 				Printf("Connected!\n");
 				Printf("Waiting for other players (have %d of %d)\n", packet.NumPresent, packet.NumNodes);
 				netHandshake.state = NHS_JOININGPLAYERS;
+				doomcom.numnodes = packet.NumPresent;
 				WaitOthers_JoinGame();
 				return;
 			}
@@ -1089,11 +1090,11 @@ void WaitOthers_JoinGame()
 		switch (packet.Message)
 		{
 		case PRE_CONACK:
-			// Do nothing
+			doomcom.numnodes = packet.NumPresent;
 			break;
 
 		case PRE_ALLHERE:
-			if (doomcom.numnodes == 2)
+			//if (doomcom.numnodes == 2)
 			{
 				int node;
 

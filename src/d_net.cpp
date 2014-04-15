@@ -178,6 +178,9 @@ CCMD (Host)
 		}
 
 		Start_HostGame();
+
+		M_StartControlPanel(true);
+		M_SetMenu(NAME_Netgamelobby, -1);
 		return;
 	}
 	else
@@ -194,7 +197,8 @@ CCMD(Join)
 	else if (netHandshake.state == NHS_NULL && !netgame)
 	{
 		Start_JoinGame(argv[1]);
-
+		M_StartControlPanel(true);
+		M_SetMenu(NAME_Netgamelobby, -1);
 		return;
 	}
 	else
@@ -3018,8 +3022,8 @@ void DoNetworkHandshake(void)
 		switch (netHandshake.state)
 		{
 		case NHS_NULL: break; // Do nothing
-		case NHS_WAITING: Wait_HostGame(); break;
-		case NHS_GO: Go_HostGame(); break;
+		case NHS_WAITING: Wait_HostGame(); M_NotifyNewPlayer(); break;
+		case NHS_GO: Go_HostGame(); M_NotifyNewPlayer(); break;
 		case NHS_INITARBITRATE: 
 			D_InitArbitrate();
 			// [ED850] The moment we call D_InitArbitrate, the game state is no longer stable. For now, this will be are locking call
@@ -3043,8 +3047,8 @@ void DoNetworkHandshake(void)
 		/*case NHS_SPAWN:
 			D_SpawnNewNetgame();
 			break;*/
-		case NHS_JOININGHOST: WaitHost_JoinGame(); break;
-		case NHS_JOININGPLAYERS: WaitOthers_JoinGame(); break;
+		case NHS_JOININGHOST: WaitHost_JoinGame(); M_NotifyNewPlayer(); break;
+		case NHS_JOININGPLAYERS: WaitOthers_JoinGame(); M_NotifyNewPlayer(); break;
 		}
 	}
 }
