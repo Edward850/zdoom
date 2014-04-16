@@ -64,7 +64,7 @@
 #include "st_start.h"
 #include "m_misc.h"
 #include "doomstat.h"
-
+#include "d_netinf.h"
 #include "i_net.h"
 
 // As per http://support.microsoft.com/kb/q192599/ the standard
@@ -127,6 +127,7 @@ struct PreGamePacket
 	BYTE Fake;
 	BYTE Message;
 	BYTE NumNodes;
+	char Name[MAXPLAYERNAME];
 	union
 	{
 		BYTE ConsoleNum;
@@ -734,6 +735,7 @@ void Start_HostGame()
 	Printf("Waiting for players\n", netHandshake.players);
 
 	netHandshake.state = NHS_WAITING;
+	strcpy(netHandshake.names[0], players[consoleplayer].userinfo.GetName());
 
 	// Start wait now.
 	Wait_HostGame();
@@ -774,7 +776,8 @@ void Wait_HostGame()
 				{
 					node = doomcom.numnodes++;
 					sendaddress[node] = *from;
-					Printf("Got connect from node %d.\n", node);
+					strcpy(netHandshake.names[node], packet.Name);
+					Printf("Got connect from %s, node %d.\n", packet.Name, node);
 				}
 
 				// Let the new guest (and everyone else) know we got their message.
@@ -786,7 +789,7 @@ void Wait_HostGame()
 			node = FindNode(from);
 			if (node >= 0)
 			{
-				Printf("Got disconnect from node %d.\n", node);
+				Printf("Got disconnect from %s, node %d.\n", packet.Name, node);
 				doomcom.numnodes--;
 				while (node < doomcom.numnodes)
 				{
@@ -1042,7 +1045,8 @@ void WaitHost_JoinGame()
 	// Let the host know we are here.
 	packet.Fake = PRE_FAKE;
 	packet.Message = PRE_CONNECT;
-	PreSend(&packet, 2, &sendaddress[1]);
+	strcpy(packet.Name, players[consoleplayer].userinfo.GetName());
+	PreSend(&packet, sizeof(packet), &sendaddress[1]);
 
 	// Listen for a reply.
 	while ((from = PreGet(&packet, sizeof(packet), true)))
@@ -1054,7 +1058,7 @@ void WaitHost_JoinGame()
 				Printf("Connected!\n");
 				Printf("Waiting for other players (have %d of %d)\n", packet.NumPresent, packet.NumNodes);
 				netHandshake.state = NHS_JOININGPLAYERS;
-				doomcom.numnodes = packet.NumPresent;
+				netHandshake.numnodes = packet.NumPresent;
 				WaitOthers_JoinGame();
 				return;
 			}
@@ -1090,11 +1094,11 @@ void WaitOthers_JoinGame()
 		switch (packet.Message)
 		{
 		case PRE_CONACK:
-			doomcom.numnodes = packet.NumPresent;
+			netHandshake.numnodes = packet.NumPresent;
 			break;
 
 		case PRE_ALLHERE:
-			//if (doomcom.numnodes == 2)
+			if (doomcom.numnodes == 2)
 			{
 				int node;
 

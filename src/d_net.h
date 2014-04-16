@@ -111,7 +111,8 @@ struct netHStruct
 	ArbitrateData	data;
 	handshake		state = NHS_NULL;
 	int				players;
-	int				nodesjoined;
+	int				numnodes;
+	char			names[MAXNETNODES][15];
 };
 extern netHStruct netHandshake;
 

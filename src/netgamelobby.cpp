@@ -229,7 +229,7 @@ bool DNetgamelobby::Responder(event_t *ev)
 void DNetgamelobby::ReadPlayerStrings()
 {
 	int i;
-	char buff[MAXPLAYERNAME];
+	//char buff[MAXPLAYERNAME];
 	if (Players.Size() != 0) ClearPlayers();
 
 	for (i = 0; i < MAXNETNODES; i++)
@@ -237,8 +237,8 @@ void DNetgamelobby::ReadPlayerStrings()
 		if (i < doomcom.numnodes)
 		{
 			FPlayerNode *node = new FPlayerNode;
-			sprintf(buff, "node %d", i);
-			node->name = buff;
+			//sprintf(buff, "node %d", i);
+			node->name = netHandshake.names[i];
 			node->host = (i == 0) ? true : false;
 			InsertPlayerNode(node);
 		}
