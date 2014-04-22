@@ -289,7 +289,9 @@ int PackUserCmd (const usercmd_t *ucmd, const usercmd_t *basis, BYTE **stream)
 
 FArchive &operator<< (FArchive &arc, ticcmd_t &cmd)
 {
-	return arc << cmd.makediff << cmd.consistancy << cmd.ucmd;
+	if (SaveVersion >= 4506)
+		return arc << cmd.makediff << cmd.consistancy << cmd.ucmd;
+	return arc << cmd.consistancy << cmd.ucmd;
 }
 
 FArchive &operator<< (FArchive &arc, usercmd_t &cmd)
