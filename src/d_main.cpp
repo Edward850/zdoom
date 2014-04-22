@@ -134,7 +134,7 @@ const FIWADInfo *D_FindIWAD(TArray<FString> &wadfiles, const char *iwad, const c
 
 void D_CheckNetGame ();
 void D_ProcessEvents ();
-void G_BuildTiccmd (ticcmd_t* cmd);
+void G_BuildTiccmd (ticcmd_t* cmd, int makediff);
 void D_DoAdvanceDemo ();
 void D_AddWildFile (TArray<FString> &wadfiles, const char *pattern);
 void D_LoadWadSettings ();
@@ -992,7 +992,7 @@ void D_DoomLoop ()
 			{
 				I_StartTic ();
 				D_ProcessEvents ();
-				G_BuildTiccmd (&netcmds[consoleplayer][maketic%BACKUPTICS]);
+				G_BuildTiccmd(&netcmds[consoleplayer][maketic%BACKUPTICS], (maketic - gametic));
 				//Added by MC: For some of that bot stuff. The main bot function.
 				int i;
 				for (i = 0; i < MAXPLAYERS; i++)

@@ -524,7 +524,7 @@ static inline int joyint(double val)
 // or reads it from the demo buffer.
 // If recording a demo, write it out
 //
-void G_BuildTiccmd (ticcmd_t *cmd)
+void G_BuildTiccmd (ticcmd_t *cmd, int makediff)
 {
 	int 		strafe;
 	int 		speed;
@@ -538,6 +538,7 @@ void G_BuildTiccmd (ticcmd_t *cmd)
 	*cmd = *base;
 
 	cmd->consistancy = consistancy[consoleplayer][(maketic/ticdup)%BACKUPTICS];
+	cmd->makediff = makediff;
 
 	strafe = Button_Strafe.bDown;
 	speed = Button_Speed.bDown ^ (int)cl_run;

@@ -119,7 +119,7 @@ int 			skiptics;
 int 			ticdup; 		
 
 void D_ProcessEvents (void); 
-void G_BuildTiccmd (ticcmd_t *cmd); 
+void G_BuildTiccmd (ticcmd_t *cmd, int makediff); 
 void D_DoAdvanceDemo (void);
 
 static void SendSetup (DWORD playersdetected[MAXNETNODES], BYTE gotsetup[MAXNETNODES], int len);
@@ -962,7 +962,7 @@ void NetUpdate (void)
 			break;			// can't hold any more
 		
 		//Printf ("mk:%i ",maketic);
-		G_BuildTiccmd (&localcmds[maketic % LOCALCMDTICS]);
+		G_BuildTiccmd(&localcmds[maketic % LOCALCMDTICS], (maketic - gametic));
 		if (maketic % ticdup == 0)
 		{
 			//Added by MC: For some of that bot stuff. The main bot function.
@@ -1225,6 +1225,7 @@ void NetUpdate (void)
 					if (l == 0)
 					{
 						WriteWord (localcmds[localstart].consistancy, &cmddata);
+						WriteByte (localcmds[localstart].makediff, &cmddata);
 						// [RH] Write out special "ticcmds" before real ticcmd
 						if (specials.used[start])
 						{
@@ -1238,8 +1239,8 @@ void NetUpdate (void)
 					{
 						if (players[playerbytes[l]].isbot)
 						{
-
 							WriteWord (0, &cmddata);	// fake consistancy word
+							WriteByte (0, &cmddata);	// fake makediff byte
 						}
 						else
 						{
@@ -1247,6 +1248,7 @@ void NetUpdate (void)
 							BYTE *spec;
 
 							WriteWord (netcmds[playerbytes[l]][start].consistancy, &cmddata);
+							WriteByte (netcmds[playerbytes[l]][start].makediff, &cmddata);
 							spec = NetSpecs[playerbytes[l]][start].GetData (&len);
 							if (spec != NULL)
 							{
@@ -2717,8 +2719,12 @@ CCMD (pings)
 
 	for (i = 0; i < MAXPLAYERS; i++)
 		if (playeringame[i])
-			Printf ("% 4d %s\n", currrecvtime[i] - lastrecvtime[i],
-					players[i].userinfo.GetName());
+		{
+			Printf("%s :\n   Res - %d\n   Diff - %d\n", 
+				players[i].userinfo.GetName(),
+				currrecvtime[i] - lastrecvtime[i], 
+				players[i].cmd.makediff);
+		}	
 }
 
 //==========================================================================

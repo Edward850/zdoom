@@ -33,6 +33,7 @@ struct ticcmd_t
 {
 	usercmd_t	ucmd;
 	SWORD		consistancy;	// checks for net game
+	BYTE		makediff;		// How many tics differnce the maketic was from the gametic
 };
 
 

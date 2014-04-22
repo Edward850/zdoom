@@ -289,7 +289,7 @@ int PackUserCmd (const usercmd_t *ucmd, const usercmd_t *basis, BYTE **stream)
 
 FArchive &operator<< (FArchive &arc, ticcmd_t &cmd)
 {
-	return arc << cmd.consistancy << cmd.ucmd;
+	return arc << cmd.makediff << cmd.consistancy << cmd.ucmd;
 }
 
 FArchive &operator<< (FArchive &arc, usercmd_t &cmd)
@@ -356,6 +356,7 @@ int SkipTicCmd (BYTE **stream, int count)
 		bool moreticdata = true;
 
 		flow += 2;		// Skip consistancy marker
+		flow += 1;		// Skip makediff marker
 		while (moreticdata)
 		{
 			BYTE type = *flow++;
@@ -414,6 +415,7 @@ void ReadTicCmd (BYTE **stream, int player, int tic)
 
 	tcmd = &netcmds[player][ticmod];
 	tcmd->consistancy = ReadWord (stream);
+	tcmd->makediff = ReadByte(stream);
 
 	start = *stream;
 
