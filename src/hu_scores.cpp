@@ -61,7 +61,7 @@
 
 static void HU_DoDrawScores (player_t *, player_t *[MAXPLAYERS]);
 static void HU_DrawTimeRemaining (int y);
-static void HU_DrawPlayer (player_t *, bool, int, int, int, int, int, int, int, int);
+static void HU_DrawPlayer (player_t *, bool, int, int, int, int, int, int, int, int, int);
 
 // EXTERNAL DATA DECLARATIONS ----------------------------------------------
 
@@ -228,7 +228,7 @@ static void HU_DoDrawScores (player_t *player, player_t *sortedplayers[MAXPLAYER
 	int maxnamewidth, maxscorewidth, maxiconheight;
 	int numTeams = 0;
 	int x, y, ypadding, bottom;
-	int col2, col3, col4;
+	int col2, col3, col4, col5;
 	
 	if (deathmatch)
 	{
@@ -313,12 +313,14 @@ static void HU_DoDrawScores (player_t *player, player_t *sortedplayers[MAXPLAYER
 
 	const char *text_color = GStrings("SCORE_COLOR"),
 		*text_frags = GStrings(deathmatch ? "SCORE_FRAGS" : "SCORE_KILLS"),
-		*text_name = GStrings("SCORE_NAME");
+		*text_name = GStrings("SCORE_NAME"),
+		*text_ticdiff = GStrings("SCORE_TICDIFF");
 
 	col2 = (SmallFont->StringWidth(text_color) + 8) * CleanXfac;
 	col3 = col2 + (SmallFont->StringWidth(text_frags) + 8) * CleanXfac;
 	col4 = col3 + maxscorewidth * CleanXfac;
-	x = (SCREENWIDTH >> 1) - ((maxnamewidth * CleanXfac + col4) >> 1);
+	col5 = col4 + (maxnamewidth + 8) * CleanXfac;
+	x = (SCREENWIDTH >> 1) - (((SmallFont->StringWidth(text_ticdiff) * CleanXfac) + col5) >> 1);
 
 	screen->DrawText (SmallFont, color, x, y, text_color,
 		DTA_CleanNoMove, true, TAG_DONE);
@@ -329,6 +331,9 @@ static void HU_DoDrawScores (player_t *player, player_t *sortedplayers[MAXPLAYER
 	screen->DrawText (SmallFont, color, x + col4, y, text_name,
 		DTA_CleanNoMove, true, TAG_DONE);
 
+	screen->DrawText(SmallFont, color, x + col5, y, text_ticdiff,
+		DTA_CleanNoMove, true, TAG_DONE);
+
 	y += height + 6 * CleanYfac;
 	bottom -= height;
 
@@ -336,7 +341,7 @@ static void HU_DoDrawScores (player_t *player, player_t *sortedplayers[MAXPLAYER
 	{
 		if (playeringame[sortedplayers[i] - players])
 		{
-			HU_DrawPlayer (sortedplayers[i], player==sortedplayers[i], x, col2, col3, col4, maxnamewidth, y, ypadding, lineheight);
+			HU_DrawPlayer(sortedplayers[i], player == sortedplayers[i], x, col2, col3, col4, col5, ((SmallFont->StringWidth(text_ticdiff) * CleanXfac) + col5) + 24, y, ypadding, lineheight);
 			y += lineheight + CleanYfac;
 		}
 	}
@@ -381,7 +386,7 @@ static void HU_DrawTimeRemaining (int y)
 //
 //==========================================================================
 
-static void HU_DrawPlayer (player_t *player, bool highlight, int col1, int col2, int col3, int col4, int maxnamewidth, int y, int ypadding, int height)
+static void HU_DrawPlayer(player_t *player, bool highlight, int col1, int col2, int col3, int col4, int col5, int highlightwidth, int y, int ypadding, int height)
 {
 	int color;
 	char str[80];
@@ -391,12 +396,13 @@ static void HU_DrawPlayer (player_t *player, bool highlight, int col1, int col2,
 		// The teamplay mode uses colors to show teams, so we need some
 		// other way to do highlighting. And it may as well be used for
 		// all modes for the sake of consistancy.
-		screen->Dim(MAKERGB(200,245,255), 0.125f, col1 - 12*CleanXfac, y - 1, col4 + (maxnamewidth + 24)*CleanXfac, height + 2);
+		screen->Dim(MAKERGB(200, 245, 255), 0.125f, col1 - 12 * CleanXfac, y - 1, highlightwidth, height + 2);
 	}
 
 	col2 += col1;
 	col3 += col1;
 	col4 += col1;
+	col5 += col1;
 
 	color = HU_GetRowColor(player, highlight);
 	HU_DrawColorBar(col1, y, height, (int)(player - players));
@@ -414,6 +420,10 @@ static void HU_DrawPlayer (player_t *player, bool highlight, int col1, int col2,
 	}
 
 	screen->DrawText (SmallFont, color, col4, y + ypadding, player->userinfo.GetName(),
+		DTA_CleanNoMove, true, TAG_DONE);
+
+	mysnprintf(str, countof(str), "%d", (player->cmd.makediff * (1000 / TICRATE)));
+	screen->DrawText(SmallFont, color, col5, y + ypadding, str,
 		DTA_CleanNoMove, true, TAG_DONE);
 
 	if (teamplay && Teams[player->userinfo.GetTeam()].GetLogo().IsNotEmpty ())
