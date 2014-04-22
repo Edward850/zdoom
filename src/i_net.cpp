@@ -485,7 +485,7 @@ static void SendConAck (int num_connected, int num_needed, bool update = true)
 	packet.NumPresent = num_connected;
 	for (int node = 1; node < doomcom.numnodes; ++node)
 	{
-		PreSend (&packet, 4, &sendaddress[node]);
+		PreSend (&packet, sizeof(packet), &sendaddress[node]);
 	}
 	if (update)
 		StartScreen->NetProgress (doomcom.numnodes);
@@ -1237,11 +1237,11 @@ bool I_InitNetwork (void)
 	//		player x: -join <player 1's address>
 	if ( (i = Args->CheckParm ("-host")) )
 	{
-		HostGame (i);
+		I_FatalError("You were eaten by a grue.");
 	}
 	else if ( (i = Args->CheckParm ("-join")) )
 	{
-		JoinGame (i);
+		I_FatalError("You were eaten by a grue.");
 	}
 	else
 	{
