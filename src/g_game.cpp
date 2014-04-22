@@ -1209,18 +1209,18 @@ void G_Ticker ()
 	}
 
 	// store old player pos for reversing
-	if (gamestate == GS_LEVEL)
+	if (gamestate == GS_LEVEL && deathmatch && multiplayer) // Yes, deathmatch and multiplayer are two different things
 	{
+		int rpos = gametic%BACKUPPOS;
 		for (i = 0; i < MAXPLAYERS; i++)
 		{
-			int apos = gametic%BACKUPTICS;
 			if (playeringame[i] && players[i].mo != NULL)
 			{
-				players[i].mo->reverse_pos[apos].x = players[i].mo->x;
-				players[i].mo->reverse_pos[apos].y = players[i].mo->y;
-				players[i].mo->reverse_pos[apos].z = players[i].mo->z;
-				players[i].mo->reverse_pos[apos].height = players[i].mo->height;
-				players[i].mo->reverse_pos[apos].valid = true;
+				players[i].mo->reverse_pos[rpos].x = players[i].mo->x;
+				players[i].mo->reverse_pos[rpos].y = players[i].mo->y;
+				players[i].mo->reverse_pos[rpos].z = players[i].mo->z;
+				players[i].mo->reverse_pos[rpos].height = players[i].mo->height;
+				players[i].mo->reverse_pos[rpos].valid = true;
 			}
 		}
 	}

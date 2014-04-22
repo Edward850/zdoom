@@ -72,11 +72,11 @@ enum
 	APMETA_Slot9,
 };
 
-
+#define BACKUPPOS 36 // Should be the same as BACKUPTICS
 struct reverse_ppos
 {
 	int x, y, z, height;
-	bool valid; // Is value valid?
+	bool valid; // Is struct valid?
 };
 
 FPlayerColorSet *P_GetPlayerColorSet(FName classname, int setnum);
@@ -151,7 +151,7 @@ public:
 	fixed_t		AirCapacity;			// Multiplier for air supply underwater.
 	const PClass *FlechetteType;
 
-	reverse_ppos	reverse_pos[36];	// [ED850] Reverse player pos info.
+	reverse_ppos	reverse_pos[BACKUPPOS];	// [ED850] Reverse player pos info.
 
 	// [CW] Fades for when you are being damaged.
 	PalEntry DamageFade;
