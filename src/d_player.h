@@ -72,6 +72,13 @@ enum
 	APMETA_Slot9,
 };
 
+
+struct reverse_ppos
+{
+	int x, y, z, height;
+	bool valid; // Is value valid?
+};
+
 FPlayerColorSet *P_GetPlayerColorSet(FName classname, int setnum);
 void P_EnumPlayerColorSets(FName classname, TArray<int> *out);
 const char *GetPrintableDisplayName(const PClass *cls);
@@ -143,6 +150,8 @@ public:
 	fixed_t		UseRange;				// [NS] Distance at which player can +use
 	fixed_t		AirCapacity;			// Multiplier for air supply underwater.
 	const PClass *FlechetteType;
+
+	reverse_ppos	reverse_pos[36];	// [ED850] Reverse player pos info.
 
 	// [CW] Fades for when you are being damaged.
 	PalEntry DamageFade;

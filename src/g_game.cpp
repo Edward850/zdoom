@@ -1207,6 +1207,23 @@ void G_Ticker ()
 	default:
 		break;
 	}
+
+	// store old player pos for reversing
+	if (gamestate == GS_LEVEL)
+	{
+		for (i = 0; i < MAXPLAYERS; i++)
+		{
+			int apos = gametic%BACKUPTICS;
+			if (playeringame[i] && players[i].mo != NULL)
+			{
+				players[i].mo->reverse_pos[apos].x = players[i].mo->x;
+				players[i].mo->reverse_pos[apos].y = players[i].mo->y;
+				players[i].mo->reverse_pos[apos].z = players[i].mo->z;
+				players[i].mo->reverse_pos[apos].height = players[i].mo->height;
+				players[i].mo->reverse_pos[apos].valid = true;
+			}
+		}
+	}
 }
 
 

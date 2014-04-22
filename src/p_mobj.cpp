@@ -4362,6 +4362,8 @@ APlayerPawn *P_SpawnPlayer (FPlayerStart *mthing, int playernum, int flags)
 
 	p->velx = p->vely = 0;		// killough 10/98: initialize bobbing to 0.
 
+	memset(p->mo->reverse_pos, 0, sizeof(reverse_ppos)*36);
+
 	for (int ii = 0; ii < MAXPLAYERS; ++ii)
 	{
 		if (playeringame[ii] && players[ii].camera == oldactor)
