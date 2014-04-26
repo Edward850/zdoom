@@ -122,6 +122,9 @@ static FString	 LastSong;			// last music that was played
 static FPlayList *PlayList;
 static int		RestartEvictionsAt;	// do not restart evicted channels before this level.time
 
+static float	Real_SoundSpeed = 1.0f;	// The actual sound playback speed (updated every tic)
+static int		LastUpdateTime;		// The last time sound speed was updated
+
 // PUBLIC DATA DEFINITIONS -------------------------------------------------
 
 int sfx_empty;
@@ -134,8 +137,19 @@ BYTE *S_SoundCurve;
 int S_SoundCurveSize;
 
 FBoolCVar noisedebug ("noise", false, 0);	// [RH] Print sound debugging info?
-CVAR (Int, snd_channels, 32, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)	// number of channels available
-CVAR (Bool, snd_flipstereo, false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
+CVAR(Int, snd_channels, 32, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)	// number of channels available
+CVAR(Bool, snd_flipstereo, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+
+float S_SetSoundSpeed = 1.0f;	// The desired sound playback speed
+CCMD(snd_test_playbackspeed)	// Tests a sound playback speed
+{
+	if (argv.argc() != 2)
+	{
+		Printf("Current playback speed is %g\n", S_SetSoundSpeed);
+		return;
+	}
+	S_SetSoundSpeed = (float)clamp(atof(argv[1]), 0.0, 2.0);
+}
 
 // CODE --------------------------------------------------------------------
 
@@ -829,6 +843,7 @@ static FSoundChan *S_StartSound(AActor *actor, const sector_t *sec, const FPolyO
 	int basepriority;
 	int org_id;
 	int pitch;
+	float frequency = 0.0f;
 	FSoundChan *chan;
 	FVector3 pos, vel;
 	FRolloffInfo *rolloff;
@@ -1077,7 +1092,7 @@ static FSoundChan *S_StartSound(AActor *actor, const sector_t *sec, const FPolyO
 		{
 			SoundListener listener;
 			S_SetListener(listener, players[consoleplayer].camera);
-			chan = (FSoundChan*)GSnd->StartSound3D (sfx->data, &listener, volume, rolloff, attenuation, pitch, basepriority, pos, vel, channel, startflags, NULL);
+			chan = (FSoundChan*)GSnd->StartSound3D(sfx->data, &listener, volume, rolloff, attenuation, pitch, basepriority, pos, vel, channel, startflags, NULL, &frequency, Real_SoundSpeed);
 		}
 		else
 		{
@@ -1111,6 +1126,7 @@ static FSoundChan *S_StartSound(AActor *actor, const sector_t *sec, const FPolyO
 		chan->Priority = basepriority;
 		chan->DistanceScale = attenuation;
 		chan->SourceType = type;
+		chan->Frequency = frequency;
 		switch (type)
 		{
 		case SOURCE_Actor:		chan->Actor = actor;	break;
@@ -1176,7 +1192,7 @@ void S_RestartSound(FSoundChan *chan)
 
 		chan->ChanFlags &= ~(CHAN_EVICTED|CHAN_ABSTIME);
 		ochan = (FSoundChan*)GSnd->StartSound3D(sfx->data, &listener, chan->Volume, &chan->Rolloff, chan->DistanceScale, chan->Pitch,
-			chan->Priority, pos, vel, chan->EntChannel, startflags, chan);
+			chan->Priority, pos, vel, chan->EntChannel, startflags, chan, NULL, Real_SoundSpeed);
 	}
 	else
 	{
@@ -1919,6 +1935,7 @@ void S_UpdateSounds (AActor *listenactor)
 {
 	FVector3 pos, vel;
 	SoundListener listener;
+	bool Update = false;
 
 	I_UpdateMusic();
 
@@ -1933,6 +1950,20 @@ void S_UpdateSounds (AActor *listenactor)
 		S_ActivatePlayList(false);
 	}
 
+	if (LastUpdateTime != level.time)
+	{
+		LastUpdateTime = level.time;
+		
+		if (Real_SoundSpeed != S_SetSoundSpeed)
+		{
+			Update = true;
+			if (Real_SoundSpeed > S_SetSoundSpeed)
+				Real_SoundSpeed = MAX((Real_SoundSpeed - 0.05f), S_SetSoundSpeed);
+			else
+				Real_SoundSpeed = MIN((Real_SoundSpeed + 0.05f), S_SetSoundSpeed);
+		}
+	}
+
 	// should never happen
 	S_SetListener(listener, listenactor);
 
@@ -1941,6 +1972,7 @@ void S_UpdateSounds (AActor *listenactor)
 		if ((chan->ChanFlags & (CHAN_EVICTED | CHAN_IS3D)) == CHAN_IS3D)
 		{
 			CalcPosVel(chan, &pos, &vel);
+			if (Update) GSnd->UpdateSoundFrequency(chan, chan->Pitch, chan->Frequency, Real_SoundSpeed);
 			GSnd->UpdateSoundParams3D(&listener, chan, !!(chan->ChanFlags & CHAN_AREA), pos, vel);
 		}
 		chan->ChanFlags &= ~CHAN_JUSTSTARTED;

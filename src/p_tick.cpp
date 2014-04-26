@@ -105,7 +105,7 @@ void P_Ticker (void)
 			break;
 	}
 
-	if ( i == MAXPLAYERS )
+	if (i == MAXPLAYERS)
 		S_ResumeSound (false);
 
 	P_ResetSightCounters (false);

@@ -169,7 +169,7 @@ public:
 	{
 		return NULL;
 	}
-	FISoundChannel *StartSound3D (SoundHandle sfx, SoundListener *listener, float vol, FRolloffInfo *rolloff, float distscale, int pitch, int priority, const FVector3 &pos, const FVector3 &vel, int channum, int chanflags, FISoundChannel *reuse_chan)
+	FISoundChannel *StartSound3D(SoundHandle sfx, SoundListener *listener, float vol, FRolloffInfo *rolloff, float distscale, int pitch, int priority, const FVector3 &pos, const FVector3 &vel, int channum, int chanflags, FISoundChannel *reuse_chan, float *frequency, float playbackSpeed)
 	{
 		return NULL;
 	}
@@ -208,6 +208,11 @@ public:
 
 	// Updates the volume, separation, and pitch of a sound channel.
 	void UpdateSoundParams3D (SoundListener *listener, FISoundChannel *chan, bool areasound, const FVector3 &pos, const FVector3 &vel)
+	{
+	}
+
+	// Changes the playback frequency of a sound channel based on the specified multiplier.
+	void UpdateSoundFrequency(FISoundChannel *chan, SWORD origPitch, float origFreq, float multFreq)
 	{
 	}
 

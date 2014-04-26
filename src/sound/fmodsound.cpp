@@ -1762,7 +1762,7 @@ FISoundChannel *FMODSoundRenderer::StartSound(SoundHandle sfx, float vol, int pi
 FISoundChannel *FMODSoundRenderer::StartSound3D(SoundHandle sfx, SoundListener *listener, float vol, 
 	FRolloffInfo *rolloff, float distscale,
 	int pitch, int priority, const FVector3 &pos, const FVector3 &vel,
-	int channum, int flags, FISoundChannel *reuse_chan)
+	int channum, int flags, FISoundChannel *reuse_chan, float *frequency, float playbackSpeed)
 {
 	FMOD_RESULT result;
 	FMOD_MODE mode;
@@ -1839,7 +1839,9 @@ FISoundChannel *FMODSoundRenderer::StartSound3D(SoundHandle sfx, SoundListener *
 		}
 		if (freq != 0)
 		{
-			chan->setFrequency(freq);
+			if (frequency != NULL)
+				*frequency = def_freq;
+			UpdateSoundFrequency(chan, pitch, def_freq, playbackSpeed);
 		}
 		chan->setVolume(vol);
 		if (mode & FMOD_3D)
@@ -2205,6 +2207,38 @@ void FMODSoundRenderer::UpdateSoundParams3D(SoundListener *listener, FISoundChan
 		fchan->setMode(mode);
 	}
 	fchan->set3DAttributes((FMOD_VECTOR *)&pos[0], (FMOD_VECTOR *)&vel[0]);
+}
+
+//==========================================================================
+//
+// FMODSoundRenderer :: UpdateSoundFrequency
+//
+//==========================================================================
+
+void FMODSoundRenderer::UpdateSoundFrequency(FISoundChannel *chan, SWORD origPitch, float origFreq, float multFreq)
+{
+	if (chan == NULL || chan->SysChannel == NULL)
+		return;
+
+	FMOD::Channel *fchan = (FMOD::Channel *)chan->SysChannel;
+
+	//if (FMOD_OK == ((FMOD::Sound *)fchan.data)->getDefaults(&def_freq, &def_vol, &def_pan, &def_priority))
+	{
+		//float newfreq = PITCH(origFreq, origPitch) * multFreq;
+		fchan->setFrequency(PITCH(origFreq, origPitch) * multFreq);
+	}
+}
+
+void FMODSoundRenderer::UpdateSoundFrequency(FMOD::Channel *chan, SWORD origPitch, float origFreq, float multFreq)
+{
+	if (chan == NULL)
+		return;
+
+	//if (FMOD_OK == ((FMOD::Sound *)fchan.data)->getDefaults(&def_freq, &def_vol, &def_pan, &def_priority))
+	{
+		//float newfreq = PITCH(origFreq, origPitch) * multFreq;
+		chan->setFrequency(PITCH(origFreq, origPitch) * multFreq);
+	}
 }
 
 //==========================================================================

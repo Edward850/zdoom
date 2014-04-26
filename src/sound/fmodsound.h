@@ -28,7 +28,7 @@ public:
 
 	// Starts a sound.
 	FISoundChannel *StartSound (SoundHandle sfx, float vol, int pitch, int chanflags, FISoundChannel *reuse_chan);
-	FISoundChannel *StartSound3D (SoundHandle sfx, SoundListener *listener, float vol, FRolloffInfo *rolloff, float distscale, int pitch, int priority, const FVector3 &pos, const FVector3 &vel, int channum, int chanflags, FISoundChannel *reuse_chan);
+	FISoundChannel *StartSound3D(SoundHandle sfx, SoundListener *listener, float vol, FRolloffInfo *rolloff, float distscale, int pitch, int priority, const FVector3 &pos, const FVector3 &vel, int channum, int chanflags, FISoundChannel *reuse_chan, float *frequency, float playbackSpeed);
 
 	// Stops a sound channel.
 	void StopChannel (FISoundChannel *chan);
@@ -56,6 +56,10 @@ public:
 
 	// Updates the position of a sound channel.
 	void UpdateSoundParams3D (SoundListener *listener, FISoundChannel *chan, bool areasound, const FVector3 &pos, const FVector3 &vel);
+
+	// Changes the playback frequency of a sound channel based on the specified multiplier.
+	void UpdateSoundFrequency(FISoundChannel *chan, SWORD origPitch, float origFreq, float multFreq);
+	void UpdateSoundFrequency(FMOD::Channel *chan, SWORD origPitch, float origFreq, float multFreq);
 
 	void UpdateListener (SoundListener *listener);
 	void UpdateSounds ();

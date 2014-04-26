@@ -171,6 +171,8 @@ extern FRolloffInfo S_Rolloff;
 extern BYTE *S_SoundCurve;
 extern int S_SoundCurveSize;
 
+extern float S_SetSoundSpeed;
+
 // Information about one playing sound.
 struct sector_t;
 struct FPolyObj;
@@ -188,6 +190,7 @@ struct FSoundChan : public FISoundChannel
 	SWORD		NearLimit;
 	BYTE		SourceType;
 	float		LimitRange;
+	float		Frequency;	// Sound's original frequency
 	union
 	{
 		AActor			*Actor;		// Used for position and velocity.

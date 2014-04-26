@@ -1396,7 +1396,7 @@ void APowerTimeFreezer::InitEffect()
 		return;
 
 	// When this powerup is in effect, pause the music.
-	S_PauseSound(false, false);
+	S_PauseSound(false, true);
 
 	// Give the player and his teammates the power to move when time is frozen.
 	freezemask = 1 << (Owner->player - players);
@@ -1457,6 +1457,15 @@ void APowerTimeFreezer::DoEffect()
 		level.flags2 |= LEVEL2_FROZEN;
 	else
 		level.flags2 &= ~LEVEL2_FROZEN;
+
+	if (EffectTics <= 4*32)
+	{
+		S_SetSoundSpeed = ((float)(4 * 32) - EffectTics) / (float)(4 * 32);
+	}
+	else
+	{
+		S_SetSoundSpeed = 0.0;
+	}
 }
 
 //===========================================================================
@@ -1498,6 +1507,7 @@ void APowerTimeFreezer::EndEffect()
 
 		// Also, turn the music back on.
 		S_ResumeSound(false);
+		S_SetSoundSpeed = 1.0;
 	}
 }
 
