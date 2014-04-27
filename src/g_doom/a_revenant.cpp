@@ -55,8 +55,9 @@ DEFINE_ACTION_FUNCTION(AActor, A_Tracer)
 	// levelstarttic from gametic:
 	//
 	// [RH] level.time is always 0-based, so nothing special to do here.
+	// [ED850] Swapped out level.time with timecounter, as part of the time freeze power cleanup.
 
-	if (level.time & 3)
+	if (self->timecounter & 3)
 		return;
 	
 	// spawn a puff of smoke behind the rocket

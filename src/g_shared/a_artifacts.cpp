@@ -1412,22 +1412,7 @@ void APowerTimeFreezer::InitEffect()
 		}
 	}
 
-	// [RH] The effect ends one tic after the counter hits zero, so make
-	// sure we start at an odd count.
-	EffectTics += !(EffectTics & 1);
-	if ((EffectTics & 1) == 0)
-	{
-		EffectTics++;
-	}
-	// Make sure the effect starts and ends on an even tic.
-	if ((level.time & 1) == 0)
-	{
-		level.flags2 |= LEVEL2_FROZEN;
-	}
-	else
-	{
-		EffectTics++;
-	}
+	level.flags2 |= LEVEL2_FROZEN;
 }
 
 //===========================================================================
@@ -1439,21 +1424,17 @@ void APowerTimeFreezer::InitEffect()
 void APowerTimeFreezer::DoEffect()
 {
 	Super::DoEffect();
-	// [RH] Do not change LEVEL_FROZEN on odd tics, or the Revenant's tracer
-	// will get thrown off.
-	// [ED850] Don't change it if the player is predicted either.
-	if (level.time & 1 || (Owner != NULL && Owner->player != NULL && Owner->player->cheats & CF_PREDICTING))
+	// [ED850] Don't touch this if the player is predicted.
+	if ((Owner != NULL && Owner->player != NULL && Owner->player->cheats & CF_PREDICTING))
 	{
 		return;
 	}
-	// [RH] The "blinking" can't check against EffectTics exactly or it will
-	// never happen, because InitEffect ensures that EffectTics will always
-	// be odd when level.time is even.
+
 	if ( EffectTics > 4*32 
-		|| (( EffectTics > 3*32 && EffectTics <= 4*32 ) && ((EffectTics + 1) & 15) != 0 )
-		|| (( EffectTics > 2*32 && EffectTics <= 3*32 ) && ((EffectTics + 1) & 7) != 0 )
-		|| (( EffectTics >   32 && EffectTics <= 2*32 ) && ((EffectTics + 1) & 3) != 0 )
-		|| (( EffectTics >    0 && EffectTics <= 1*32 ) && ((EffectTics + 1) & 1) != 0 ))
+		|| (( EffectTics > 3*32 && EffectTics <= 4*32 ) && (EffectTics & 15) != 0 )
+		|| (( EffectTics > 2*32 && EffectTics <= 3*32 ) && (EffectTics & 7) != 0 )
+		|| (( EffectTics >   32 && EffectTics <= 2*32 ) && (EffectTics & 3) != 0 )
+		|| (( EffectTics >    0 && EffectTics <= 1*32 ) && (EffectTics & 1) != 0 ))
 		level.flags2 |= LEVEL2_FROZEN;
 	else
 		level.flags2 &= ~LEVEL2_FROZEN;

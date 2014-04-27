@@ -3053,6 +3053,8 @@ void AActor::Tick ()
 			}
 		}
 
+		timecounter++;
+
 		UnlinkFromWorld ();
 		flags |= MF_NOBLOCKMAP;
 		x += velx;
@@ -3097,6 +3099,7 @@ void AActor::Tick ()
 			}
 		}
 
+		timecounter++;
 
 		if (effects & FX_ROCKET) 
 		{
@@ -3954,6 +3957,9 @@ AActor *AActor::StaticSpawn (const PClass *type, fixed_t ix, fixed_t iy, fixed_t
 	{
 		level.total_secrets++;
 	}
+
+	actor->timecounter = level.time;
+
 	return actor;
 }
 
