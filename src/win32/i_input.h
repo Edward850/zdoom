@@ -60,6 +60,7 @@ public:
 	virtual ~FInputDevice() = 0;
 	virtual bool GetDevice() = 0;
 	virtual void ProcessInput();
+	virtual void ProcessVibrate(USHORT vSmall, USHORT vBig);
 	virtual bool ProcessRawInput(tagRAWINPUT *raw, int code);
 	virtual bool WndProcHook(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam, LRESULT *result);
 };

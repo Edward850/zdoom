@@ -167,6 +167,9 @@ CUSTOM_CVAR(Bool, norawinput, false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG|CVAR_NOINITC
 	Printf("This won't take effect until "GAMENAME" is restarted.\n");
 }
 
+CVAR(Int, joy_vibratetest_small, 0, CVAR_NOSAVE)
+CVAR(Int, joy_vibratetest_big, 0, CVAR_NOSAVE)
+
 extern int chatmodeon;
 
 static void I_CheckGUICapture ()
@@ -865,6 +868,25 @@ void I_GetJoysticks(TArray<IJoystickConfig *> &sticks)
 	}
 }
 
+void I_SendVibrate(unsigned short vSmall, unsigned short vBig)
+{
+	if (joy_vibratetest_small > 0)
+		vSmall = joy_vibratetest_small;
+	if (joy_vibratetest_big > 0)
+		vBig = joy_vibratetest_big;
+
+	if (use_joystick)
+	{
+		for (int i = 0; i < NUM_JOYDEVICES; ++i)
+		{
+			if (JoyDevices[i] != NULL)
+			{
+				JoyDevices[i]->ProcessVibrate(vSmall, vBig);
+			}
+		}
+	}
+}
+
 // If a new controller was added, returns a pointer to it.
 IJoystickConfig *I_UpdateDeviceList()
 {
@@ -965,6 +987,21 @@ FInputDevice::~FInputDevice()
 //==========================================================================
 
 void FInputDevice::ProcessInput()
+{
+}
+
+//==========================================================================
+//
+// FInputDevice :: ProcessVibrate
+//
+// Sends vibration infomation to any device that can output it.
+// 
+// XINPUT has two motors use unsigned shorts for infomation, so this seems
+// to be the most "default" way to handle gamepad vibration.
+//
+//==========================================================================
+
+void FInputDevice::ProcessVibrate(USHORT vSmall, USHORT vBig)
 {
 }
 

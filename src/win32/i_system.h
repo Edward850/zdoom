@@ -107,6 +107,7 @@ void I_Quit (void);
 
 
 void I_Tactile (int on, int off, int total);
+void I_SendVibrate(unsigned short vSmall, unsigned short vBig);
 
 void STACK_ARGS I_Error (const char *error, ...) GCCPRINTF(1,2);
 void STACK_ARGS I_FatalError (const char *error, ...) GCCPRINTF(1,2);

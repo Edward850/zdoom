@@ -30,7 +30,7 @@
 // TYPES -------------------------------------------------------------------
 
 typedef DWORD (WINAPI *XInputGetStateType)(DWORD index, XINPUT_STATE *state);
-typedef DWORD (WINAPI *XInputSetStateType)(DWORD index, XINPUT_STATE *state);
+typedef DWORD (WINAPI *XInputSetStateType)(DWORD index, XINPUT_VIBRATION *state);
 typedef DWORD (WINAPI *XInputGetCapabilitiesType)(DWORD index, DWORD flags, XINPUT_CAPABILITIES *caps);
 typedef void  (WINAPI *XInputEnableType)(BOOL enable);
 
@@ -41,6 +41,7 @@ public:
 	~FXInputController();
 
 	void ProcessInput();
+	void ProcessVibrate(USHORT vSmall, USHORT vBig);
 	void AddAxes(float axes[NUM_JOYAXIS]);
 	bool IsConnected() { return Connected; }
 
@@ -116,6 +117,7 @@ public:
 
 	bool GetDevice();
 	void ProcessInput();
+	void ProcessVibrate(USHORT vSmall, USHORT vBig);
 	bool WndProcHook(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam, LRESULT *result);
 	void AddAxes(float axes[NUM_JOYAXIS]);
 	void GetDevices(TArray<IJoystickConfig *> &sticks);
@@ -143,11 +145,13 @@ CUSTOM_CVAR(Bool, joy_xinput, true, CVAR_GLOBALCONFIG|CVAR_ARCHIVE|CVAR_NOINITCA
 	D_PostEvent(&ev);
 }
 
+CVAR(Bool, joy_xinput_vibrate, false, CVAR_GLOBALCONFIG | CVAR_ARCHIVE | CVAR_NOINITCALL)
+
 // PRIVATE DATA DEFINITIONS ------------------------------------------------
 
 static XInputGetStateType			InputGetState;
 static XInputSetStateType			InputSetState;
-static XInputGetCapabilitiesType	InputGetCapabilities;
+static XInputGetCapabilitiesType	InputGetCapabilitiesk
 static XInputEnableType				InputEnable;
 
 static const char *AxisNames[] =
@@ -304,6 +308,26 @@ void FXInputController::ProcessTrigger(int value, AxisInfo *axis, int base)
 	Joy_GenerateButtonEvents(axis->ButtonValue, buttonstate, 1, base);
 	axis->ButtonValue = buttonstate;
 	axis->Value = float(axisval);
+}
+
+//==========================================================================
+//
+// FXInputController :: ProcessVibrate								
+//
+//==========================================================================
+
+void FXInputController::ProcessVibrate(USHORT vSmall, USHORT vBig)
+{
+	XINPUT_VIBRATION vibration;
+	ZeroMemory(&vibration, sizeof(XINPUT_VIBRATION));
+
+	if (joy_xinput_vibrate)
+	{
+		vibration.wRightMotorSpeed = vSmall;
+		vibration.wLeftMotorSpeed = vBig;
+	}
+
+	InputSetState(Index, &vibration);
 }
 
 //==========================================================================
@@ -680,6 +704,22 @@ void FXInputManager::ProcessInput()
 	for (int i = 0; i < XUSER_MAX_COUNT; ++i)
 	{
 		Devices[i]->ProcessInput();
+	}
+}
+
+//==========================================================================
+//
+// FXInputManager :: ProcessVibration
+//
+// Process vibration for every attached device.
+//
+//==========================================================================
+
+void FXInputManager::ProcessVibrate(USHORT vSmall, USHORT vBig)
+{
+	for (int i = 0; i < XUSER_MAX_COUNT; ++i)
+	{
+		Devices[i]->ProcessVibrate(vSmall, vBig);
 	}
 }
 

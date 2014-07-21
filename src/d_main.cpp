@@ -107,6 +107,7 @@
 #include "resourcefiles/resourcefile.h"
 #include "r_renderer.h"
 #include "p_local.h"
+#include "a_sharedglobal.h"
 
 #ifdef USE_POLYMOST
 #include "r_polymost.h"
@@ -777,6 +778,7 @@ void D_Display ()
 				viewwindowx + viewwidth, viewwindowy + viewheight);
 			P_PredictPlayer(&players[consoleplayer]);
 			Renderer->RenderView(&players[consoleplayer]);
+			D_DoVibrate();
 			P_UnPredictPlayer();
 			if ((hw2d = screen->Begin2D(viewactive)))
 			{
@@ -926,6 +928,23 @@ void D_Display ()
 
 	cycles.Unclock();
 	FrameCycles = cycles;
+}
+
+// Update vibrate response
+void D_DoVibrate ()
+{
+	int vSmall = 0, vBig = 0, intensity = 0;
+	if (players[consoleplayer].camera != NULL && !paused)
+	{
+		if (players[consoleplayer].camera->player != NULL)
+		{
+			vSmall = (players[consoleplayer].camera->player->damagecount * USHRT_MAX) / 100;
+		}
+		
+		intensity = DEarthquake::StaticGetQuakeIntensity(players[consoleplayer].camera);
+		vBig = (intensity * USHRT_MAX) / 9; // 9 is the maximum intensity for DEarthquake
+	}
+	I_SendVibrate(vSmall, vBig);
 }
 
 //==========================================================================
