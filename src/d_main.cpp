@@ -145,6 +145,8 @@ void D_LoadWadSettings ();
 void D_DoomLoop ();
 static const char *BaseFileSearch (const char *file, const char *ext, bool lookfirstinprogdir=false);
 
+void D_DoVibrate();
+
 // EXTERNAL DATA DECLARATIONS ----------------------------------------------
 
 EXTERN_CVAR (Float, turbo)

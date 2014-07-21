@@ -151,7 +151,7 @@ CVAR(Bool, joy_xinput_vibrate, false, CVAR_GLOBALCONFIG | CVAR_ARCHIVE | CVAR_NO
 
 static XInputGetStateType			InputGetState;
 static XInputSetStateType			InputSetState;
-static XInputGetCapabilitiesType	InputGetCapabilitiesk
+static XInputGetCapabilitiesType	InputGetCapabilities;
 static XInputEnableType				InputEnable;
 
 static const char *AxisNames[] =
