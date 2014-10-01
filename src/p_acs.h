@@ -123,6 +123,7 @@ void P_CollectACSGlobalStrings(const SDWORD *stack, int stackdepth);
 void P_ReadACSVars(PNGHandle *);
 void P_WriteACSVars(FILE*);
 void P_ClearACSVars(bool);
+bool P_CheckACSVars(void);
 void P_SerializeACSScriptNumber(FArchive &arc, int &scriptnum, bool was2byte);
 
 struct ACSProfileInfo

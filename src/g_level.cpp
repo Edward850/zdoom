@@ -1847,6 +1847,26 @@ void P_WriteACSDefereds (FILE *file)
 
 //==========================================================================
 //
+// P_CheckACSDefereds
+//
+// Checks and returns true if any maps have defered scripts.
+//
+//==========================================================================
+
+bool P_CheckACSDefereds()
+{
+	for (unsigned int i = 0; i < wadlevelinfos.Size(); i++)
+	{
+		if (wadlevelinfos[i].defered)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+//==========================================================================
+//
 //
 //==========================================================================
 

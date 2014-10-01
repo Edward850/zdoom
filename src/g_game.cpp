@@ -115,6 +115,13 @@ CVAR (Bool, chasedemo, false, 0);
 CVAR (Bool, storesavepic, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 CVAR (Bool, longsavemessages, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 CVAR (String, save_dir, "", CVAR_ARCHIVE|CVAR_GLOBALCONFIG);
+CUSTOM_CVAR (Int, pistolrestart, 0, CVAR_SERVERINFO)
+{
+	if (self < 0 || self > 3)
+	{
+		self = 0;
+	}
+}
 EXTERN_CVAR (Float, con_midtime);
 
 //==========================================================================
@@ -1612,7 +1619,17 @@ void G_DoReborn (int playernum, bool freshbot)
 {
 	if (!multiplayer && !(level.flags2 & LEVEL2_ALLOWRESPAWN))
 	{
-		if (BackupSaveName.Len() > 0 && FileExists (BackupSaveName.GetChars()))
+		// Check pistol restart settings for each type
+		bool restart_globalscripts = true, restart_ishub = true;
+		if (pistolrestart > 0)
+		{
+			restart_globalscripts = (pistolrestart < 2) ? (P_CheckACSDefereds() || P_CheckACSVars()) : false;
+			restart_ishub = (pistolrestart < 3) ? !!(level.clusterflags & CLUSTER_HUB) : false;
+		}
+
+		if (BackupSaveName.Len() > 0 && FileExists(BackupSaveName.GetChars()) &&
+			(restart_globalscripts || restart_ishub))
+			// Hubs, future scripts and globals means saves only
 		{ // Load game from the last point it was saved
 			savename = BackupSaveName;
 			gameaction = ga_autoloadgame;

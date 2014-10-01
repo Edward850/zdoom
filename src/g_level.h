@@ -529,6 +529,7 @@ void G_ParseMapInfo (FString basemapinfo);
 
 void G_ClearSnapshots (void);
 void P_RemoveDefereds ();
+bool P_CheckACSDefereds(void);
 void G_SnapshotLevel (void);
 void G_UnSnapshotLevel (bool keepPlayers);
 struct PNGHandle;

@@ -868,6 +868,14 @@ OptionValue dehopt
 	2,	"Only last one"
 }
 
+OptionValue RestartOpt
+{
+	0,	"Never"
+	1,	"Smart"
+	2,	"Not in HUBs"
+	3,	"Reset Everything"
+}
+
 OptionMenu "MiscOptions"
 {
 	Title "Miscellaneous Options"
@@ -882,6 +890,7 @@ OptionMenu "MiscOptions"
 	Option "Enable cheats from all games",			"allcheats", "OnOff"
 	Option "Enable autosaves",						"disableautosave", "Autosave"
 	Slider "Number of autosaves",					"autosavecount", 1, 20, 1, 0
+	Option "Pistol restart on death",				"pistolrestart", "RestartOpt"
 	Option "Load *.deh/*.bex lumps",				"dehload", "dehopt"
 	StaticText " "
 	Option "Cache nodes",							"gl_cachenodes", "OnOff"

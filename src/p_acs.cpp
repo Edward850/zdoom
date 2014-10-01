@@ -843,6 +843,33 @@ void P_ClearACSVars(bool alsoglobal)
 
 //============================================================================
 //
+// P_CheckACSVars
+//
+// Checks and returns true if any ACS world/global values are in use.
+//
+//============================================================================
+
+bool P_CheckACSVars()
+{
+	int i;
+
+	for (i = 0; i < NUM_WORLDVARS; ++i)
+	{
+		if (ACS_WorldArrays[i].CountUsed() || ACS_WorldVars[i])
+			return true;
+	}
+
+	for (i = 0; i < NUM_GLOBALVARS; ++i)
+	{
+		if (ACS_GlobalArrays[i].CountUsed() || ACS_GlobalVars[i])
+			return true;
+	}
+
+	return false;
+}
+
+//============================================================================
+//
 // WriteVars
 //
 //============================================================================
