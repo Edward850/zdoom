@@ -172,6 +172,7 @@ public:
 	// Static interface
 	static void StaticClearRandom ();
 	static DWORD StaticSumSeeds ();
+	static void StaticSumSeedDebug ();
 	static void StaticReadRNGState (PNGHandle *png);
 	static void StaticWriteRNGState (FILE *file);
 	static FRandom *StaticFindRNG(const char *name);

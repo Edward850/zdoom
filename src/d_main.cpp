@@ -2221,6 +2221,14 @@ void D_DoomMain (void)
 		execLogfile(logfile);
 	}
 
+	if (Args->CheckParm("-debugfile"))
+	{
+		char filename[20];
+		mysnprintf(filename, countof(filename), "debug%i.txt", consoleplayer);
+		Printf("debug output to: %s\n", filename);
+		debugfile = fopen(filename, "w");
+	}
+
 	D_DoomInit();
 	PClass::StaticInit ();
 	atterm(FinalGC);
@@ -2289,6 +2297,10 @@ void D_DoomMain (void)
 		pwads.ShrinkToFit();
 
 		Printf ("W_Init: Init WADfiles.\n");
+		if (debugfile)
+		{
+			Printf("Notice: debugfile is incredibly verbose with file management. Expect loading files to take much longer then usual.\n");
+		}
 		Wads.InitMultipleFiles (allwads);
 		allwads.Clear();
 		allwads.ShrinkToFit();

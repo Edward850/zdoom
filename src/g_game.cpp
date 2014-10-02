@@ -1177,6 +1177,7 @@ void G_Ticker ()
 	case GS_LEVEL:
 		P_Ticker ();
 		AM_Ticker ();
+		FRandom::StaticSumSeedDebug();
 		break;
 
 	case GS_TITLELEVEL:

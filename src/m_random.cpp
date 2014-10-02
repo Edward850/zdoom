@@ -285,6 +285,26 @@ DWORD FRandom::StaticSumSeeds ()
 
 //==========================================================================
 //
+// FRandom :: DebugSumSeeds
+//
+// Writes the RNGs used for StaticSumSeeds into a debugfile, if used.
+//
+//==========================================================================
+
+void FRandom::StaticSumSeedDebug()
+{
+	if (debugfile)
+	{
+		fprintf(debugfile, "pr_spawnmobj.sfmt.u[0] = %d, idx = %d\npr_acs.sfmt.u[0] = %d, idx = %d\npr_chase.sfmt.u[0] = %d, idx = %d\npr_damagemobj.sfmt.u[0] = %d, idx = %d\n",
+			pr_spawnmobj.sfmt.u[0], pr_spawnmobj.idx,
+			pr_acs.sfmt.u[0], pr_acs.idx,
+			pr_chase.sfmt.u[0], pr_chase.idx,
+			pr_damagemobj.sfmt.u[0], pr_damagemobj.idx);
+	}
+}
+
+//==========================================================================
+//
 // FRandom :: StaticWriteRNGState
 //
 // Stores the state of every RNG into a savegame.

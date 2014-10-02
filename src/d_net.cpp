@@ -1795,14 +1795,6 @@ void D_CheckNetGame (void)
 	// [RH] Setup user info
 	D_SetupUserInfo ();
 
-	if (Args->CheckParm ("-debugfile"))
-	{
-		char filename[20];
-		mysnprintf (filename, countof(filename), "debug%i.txt", consoleplayer);
-		Printf ("debug output to: %s\n", filename);
-		debugfile = fopen (filename, "w");
-	}
-
 	if (netgame)
 	{
 		GameConfig->ReadNetVars ();	// [RH] Read network ServerInfo cvars
