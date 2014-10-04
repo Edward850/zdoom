@@ -186,4 +186,5 @@ void G_ReadHubInfo (PNGHandle *png)
 void G_ClearHubInfo()
 {
 	hubdata.Clear();
+	level.clusterstart = "";
 }

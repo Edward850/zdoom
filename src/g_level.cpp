@@ -313,7 +313,7 @@ static void InitPlayerClasses ()
 //
 //==========================================================================
 
-void G_InitNew (const char *mapname, bool bTitleLevel)
+void G_InitNew(FString mapname, bool bTitleLevel, int position)
 {
 	EGameSpeed oldSpeed;
 	bool wantFast;
@@ -454,7 +454,7 @@ void G_InitNew (const char *mapname, bool bTitleLevel)
 	{
 		gamestate = GS_LEVEL;
 	}
-	G_DoLoadLevel (0, false);
+	G_DoLoadLevel(position, false);
 }
 
 //
@@ -840,7 +840,7 @@ void G_DoLoadLevel (int position, bool autosave)
 	else
 		lastposition = position;
 
-	G_InitLevelLocals ();
+	G_InitLevelLocals(position);
 	StatusBar->DetachAllMessages ();
 
 	// Force 'teamplay' to 'true' if need be.
@@ -1207,7 +1207,7 @@ void G_FinishTravel ()
 //
 //==========================================================================
 
-void G_InitLevelLocals ()
+void G_InitLevelLocals(int position)
 {
 	level_info_t *info;
 
@@ -1271,6 +1271,13 @@ void G_InitLevelLocals ()
 
 	level.partime = info->partime;
 	level.sucktime = info->sucktime;
+
+	if (info->cluster != level.cluster || level.clusterstart.Len() == 0)
+	{
+		level.clusterstart = level.MapName;
+		level.clusterstartpos = position;
+	}
+
 	level.cluster = info->cluster;
 	level.clusterflags = clus ? clus->flags : 0;
 	level.flags |= info->flags;
@@ -1445,6 +1452,11 @@ void G_SerializeLevel (FArchive &arc, bool hubLoad)
 			level.Scrolls = new FSectorScrollValues[numsectors];
 			memset (level.Scrolls, 0, sizeof(level.Scrolls)*numsectors);
 		}
+	}
+
+	if (SaveVersion >= 4513)
+	{
+		arc << level.clusterstart << level.clusterstartpos;
 	}
 
 	FBehavior::StaticSerializeModuleStates (arc);

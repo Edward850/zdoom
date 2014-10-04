@@ -115,7 +115,7 @@ CVAR (Bool, chasedemo, false, 0);
 CVAR (Bool, storesavepic, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 CVAR (Bool, longsavemessages, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 CVAR (String, save_dir, "", CVAR_ARCHIVE|CVAR_GLOBALCONFIG);
-CUSTOM_CVAR (Int, pistolrestart, 0, CVAR_SERVERINFO)
+CUSTOM_CVAR(Int, pistolrestart, 0, CVAR_ARCHIVE | CVAR_SERVERINFO)
 {
 	if (self < 0 || self > 3)
 	{
@@ -1638,7 +1638,10 @@ void G_DoReborn (int playernum, bool freshbot)
 		{ // Reload the level from scratch
 			bool indemo = demoplayback;
 			BackupSaveName = "";
-			G_InitNew (level.MapName, false);
+			if (level.clusterflags & CLUSTER_HUB)
+				G_InitNew (level.clusterstart, false, level.clusterstartpos);
+			else
+				G_InitNew (level.MapName, false);
 			demoplayback = indemo;
 //			gameaction = ga_loadlevel;
 		}

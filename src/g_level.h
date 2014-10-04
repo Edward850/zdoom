@@ -388,6 +388,8 @@ struct FLevelLocals
 	level_info_t *info;
 	int			cluster;
 	int			clusterflags;
+	FString		clusterstart;
+	int			clusterstartpos;
 	int			levelnum;
 	int			lumpnum;
 	FString		LevelName;
@@ -482,7 +484,7 @@ extern bool savegamerestore;
 // mapname will be changed if it is a valid warptrans
 bool CheckWarpTransMap (FString &mapname, bool substitute);
 
-void G_InitNew (const char *mapname, bool bTitleLevel);
+void G_InitNew(FString mapname, bool bTitleLevel, int position = 0);
 
 // Can be called by the startup code or M_Responder.
 // A normal game starts at map 1,
@@ -514,7 +516,7 @@ void G_FinishTravel ();
 
 void G_DoLoadLevel (int position, bool autosave);
 
-void G_InitLevelLocals (void);
+void G_InitLevelLocals(int position);
 
 void G_AirControlChanged ();
 
