@@ -701,6 +701,14 @@ void HostGame (int i)
 
 	popterm ();
 
+	if (debugfile)
+	{
+		for (int i = 0; i < doomcom.numnodes; i++)
+		{
+			fprintf(debugfile, "sendaddress[%d]: %s:%d\n", i, inet_ntoa(sendaddress[i].sin_addr), sendaddress[i].sin_port);
+		}
+	}
+
 	// Now go
 	StartScreen->NetMessage ("Go");
 	packet.Fake = PRE_FAKE;
