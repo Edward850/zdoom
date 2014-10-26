@@ -63,8 +63,6 @@ static void SpawnShootDecal(AActor *t1, const FTraceResults &trace);
 static void SpawnDeepSplash(AActor *t1, const FTraceResults &trace, AActor *puff,
 	fixed_t vx, fixed_t vy, fixed_t vz, fixed_t shootz, bool ffloor = false);
 
-bool P_CheckThingsIntersect(AActor *thing, AActor *blocked);
-
 static FRandom pr_tracebleed("TraceBleed");
 static FRandom pr_checkthing("CheckThing");
 static FRandom pr_lineattack("LineAttack");
@@ -1486,24 +1484,6 @@ bool P_CheckPosition(AActor *thing, fixed_t x, fixed_t y, bool actorsonly)
 {
 	FCheckPosition tm;
 	return P_CheckPosition(thing, x, y, tm, actorsonly);
-}
-
-// [ED850] Checks if the actors currently reside in eachother.
-// This doesn't check specifics (including height), as that should be checked beforehand.
-bool P_CheckThingsIntersect(AActor *thing, AActor *blocked)
-{
-	FBoundingBox box(thing->x, thing->y, thing->radius - 1);
-	{
-		FBlockThingsIterator it2(box);
-		AActor *th;
-		while ((th = it2.Next()))
-		{
-			if (th != blocked)
-				continue;
-			return true;
-		}
-	}
-	return false;
 }
 
 //----------------------------------------------------------------------------
