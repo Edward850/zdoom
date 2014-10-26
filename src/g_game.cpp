@@ -1566,7 +1566,8 @@ void G_DeathMatchSpawnPlayer (int playernum)
 //
 FPlayerStart *G_PickPlayerStart(int playernum, int flags)
 {
-	if ((level.flags2 & LEVEL2_RANDOMPLAYERSTARTS) || (flags & PPS_FORCERANDOM))
+	if ((level.flags2 & LEVEL2_RANDOMPLAYERSTARTS) || (flags & PPS_FORCERANDOM) ||
+		playerstarts[playernum].type == 0)
 	{
 		if (!(flags & PPS_NOBLOCKINGCHECK))
 		{

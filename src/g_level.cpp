@@ -1166,7 +1166,7 @@ void G_FinishTravel ()
 			}
 		}
 
-		if (start == NULL) start = &playerstarts[pnum];
+		if (start == NULL) start = G_PickPlayerStart(pnum, 0);
 		oldpawn = pawndup;
 
 		// The player being spawned here is a short lived dummy and
