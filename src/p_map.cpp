@@ -56,11 +56,14 @@
 CVAR(Bool, cl_bloodsplats, true, CVAR_ARCHIVE)
 CVAR(Int, sv_smartaim, 0, CVAR_ARCHIVE | CVAR_SERVERINFO)
 CVAR(Bool, cl_doautoaim, false, CVAR_ARCHIVE)
+CVAR(Bool, sv_playerstomp, false, CVAR_SERVERINFO)
 
 static void CheckForPushSpecial(line_t *line, int side, AActor *mobj, bool windowcheck);
 static void SpawnShootDecal(AActor *t1, const FTraceResults &trace);
 static void SpawnDeepSplash(AActor *t1, const FTraceResults &trace, AActor *puff,
 	fixed_t vx, fixed_t vy, fixed_t vz, fixed_t shootz, bool ffloor = false);
+
+bool P_CheckThingsIntersect(AActor *thing, AActor *blocked);
 
 static FRandom pr_tracebleed("TraceBleed");
 static FRandom pr_checkthing("CheckThing");
@@ -439,6 +442,9 @@ void P_PlayerStartStomp(AActor *actor)
 
 	while ((th = it.Next()))
 	{
+		if (th->player && !sv_playerstomp)
+			continue;
+
 		if (!(th->flags & MF_SHOOTABLE))
 			continue;
 
@@ -882,7 +888,9 @@ bool PIT_CheckThing(AActor *thing, FCheckPosition &tm)
 	// Both things overlap in x or y direction
 	bool unblocking = false;
 
-	if (tm.FromPMove)
+	if (tm.FromPMove
+		// [ED850] Players may end up spawning inside eachother. Make sure they can move out, but not back in.
+		|| (tm.thing->player && thing->player))
 	{
 		// Both actors already overlap. To prevent them from remaining stuck allow the move if it
 		// takes them further apart or the move does not change the position (when called from P_ChangeSector.)
@@ -1478,6 +1486,24 @@ bool P_CheckPosition(AActor *thing, fixed_t x, fixed_t y, bool actorsonly)
 {
 	FCheckPosition tm;
 	return P_CheckPosition(thing, x, y, tm, actorsonly);
+}
+
+// [ED850] Checks if the actors currently reside in eachother.
+// This doesn't check specifics (including height), as that should be checked beforehand.
+bool P_CheckThingsIntersect(AActor *thing, AActor *blocked)
+{
+	FBoundingBox box(thing->x, thing->y, thing->radius - 1);
+	{
+		FBlockThingsIterator it2(box);
+		AActor *th;
+		while ((th = it2.Next()))
+		{
+			if (th != blocked)
+				continue;
+			return true;
+		}
+	}
+	return false;
 }
 
 //----------------------------------------------------------------------------
