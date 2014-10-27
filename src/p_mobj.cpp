@@ -4571,9 +4571,14 @@ AActor *P_SpawnMapThing (FMapThing *mthing, int position)
 	}
 	else
 	{
-		if (mthing->type >= gameinfo.player5start && mthing->type < gameinfo.player5start + MAXPLAYERS - 4)
+		// player5start only expected 4 starts, so using MAXPLAYERS has the change of overlapping to other actors
+		if (mthing->type >= gameinfo.player5start && mthing->type < gameinfo.player5start + 4)
 		{
 			pnum = mthing->type - gameinfo.player5start + 4;
+		}
+		if (mthing->type == gameinfo.playergenericstart)
+		{
+			pnum = mthing->args[1];
 		}
 	}
 

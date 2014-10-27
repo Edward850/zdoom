@@ -154,6 +154,7 @@ struct gameinfo_t
 	int defaultrespawntime;
 	int defaultdropstyle;
 	int player5start;
+	int playergenericstart;
 	DWORD pickupcolor;
 	TArray<FString> quitmessages;
 	FName mTitleColor;

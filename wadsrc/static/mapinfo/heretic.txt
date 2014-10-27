@@ -42,6 +42,7 @@ gameinfo
 	defaultdropstyle = 1
 	endoom = "ENDTEXT"
 	player5start = 4001
+	playergenericstart = 4005
 	pickupcolor = "d7 ba 45"
 	quitmessages = "$*RAVENQUITMSG"
 	menufontcolor_title = "UNTRANSLATED"
