@@ -872,7 +872,7 @@ static void ChangeSpy (int changespy)
 		do
 		{
 			pnum += step;
-			pnum &= MAXPLAYERS-1;
+			pnum %= MAXPLAYERS;
 			if (playeringame[pnum] &&
 				(!checkTeam || players[pnum].mo->IsTeammate (players[consoleplayer].mo) ||
 				(bot_allowspy && players[pnum].Bot != NULL)))
