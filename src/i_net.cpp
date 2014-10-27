@@ -233,7 +233,7 @@ void PacketSend (void)
 	{
 		if (doomcom.datalength > TRANSMIT_SIZE)
 		{
-			I_Error("Net compression failed (zlib error %d)", c);
+			I_Error("Net compression failed (zlib error %d) (msgsize %d)", c, doomcom.datalength);
 		}
 		else
 		{

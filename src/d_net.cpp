@@ -1540,7 +1540,7 @@ bool DoArbitrate (void *userdata)
 	if (consoleplayer == Net_Arbitrator)
 	{
 		for (i = 0; i < doomcom.numnodes; ++i)
-			if (data->playersdetected[i] != DWORD(1 << doomcom.numnodes) - 1 || !data->gotsetup[i])
+			if (data->playersdetected[i] != ((QWORD)1 << doomcom.numnodes) - 1 || !data->gotsetup[i])
 				break;
 
 		if (i == doomcom.numnodes)
