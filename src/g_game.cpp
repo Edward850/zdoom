@@ -141,6 +141,7 @@ gameaction_t	gameaction;
 gamestate_t 	gamestate = GS_STARTUP;
 
 int 			paused;
+bool			pauseext;
 bool 			sendpause;				// send a pause event next tic 
 bool			sendsave;				// send a save event next tic 
 bool			sendturn180;			// [RH] send a 180 degree turn next tic
@@ -162,6 +163,8 @@ int 			consoleplayer;			// player taking events
 int 			gametic;
 
 CVAR(Bool, demo_compress, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG);
+FString			newdemoname;
+FString			newdemomap;
 FString			demoname;
 bool 			demorecording;
 bool 			demoplayback;
@@ -1048,6 +1051,10 @@ void G_Ticker ()
 		case ga_loadlevel:
 			G_DoLoadLevel (-1, false);
 			break;
+		case ga_recordgame:
+			G_CheckDemoStatus();
+			G_RecordDemo(newdemoname);
+			G_BeginRecording(newdemomap);
 		case ga_newgame2:	// Silence GCC (see above)
 		case ga_newgame:
 			G_DoNewGame ();
@@ -1121,6 +1128,12 @@ void G_Ticker ()
 	// check, not just the player's x position like BOOM.
 	DWORD rngsum = FRandom::StaticSumSeeds ();
 
+	if ((gametic % ticdup) == 0)
+	{
+		//Added by MC: For some of that bot stuff. The main bot function.
+		bglobal.Main (buf);
+	}
+
 	for (i = 0; i < MAXPLAYERS; i++)
 	{
 		if (playeringame[i])
@@ -1140,13 +1153,13 @@ void G_Ticker ()
 			// If the user alt-tabbed away, paused gets set to -1. In this case,
 			// we do not want to read more demo commands until paused is no
 			// longer negative.
-			if (demoplayback && paused >= 0)
+			if (demoplayback)
 			{
 				G_ReadDemoTiccmd (cmd, i);
 			}
 			else
 			{
-				memcpy (cmd, newcmd, sizeof(ticcmd_t));
+				memcpy(cmd, newcmd, sizeof(ticcmd_t));
 			}
 
 			// check for turbo cheats
@@ -2438,6 +2451,16 @@ void G_DeferedPlayDemo (const char *name)
 
 CCMD (playdemo)
 {
+	if (netgame)
+	{
+		Printf("End your current netgame first!");
+		return;
+	}
+	if (demorecording)
+	{
+		Printf("End your current demo first!");
+		return;
+	}
 	if (argv.argc() > 1)
 	{
 		G_DeferedPlayDemo (argv[1]);

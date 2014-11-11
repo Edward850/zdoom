@@ -4117,7 +4117,7 @@ void P_RailAttack(AActor *source, int damage, int offset_xy, fixed_t offset_z, i
 		z = shootz + FixedMul(hitdist, vz);
 
 		if ((hitactor->flags & MF_NOBLOOD) ||
-			(hitactor->flags2 & (MF2_DORMANT | MF2_INVULNERABLE)))
+			(hitactor->flags2 & MF2_DORMANT || ((hitactor->flags2 & MF2_INVULNERABLE) && !(puffDefaults->flags3 & MF3_FOILINVUL))))
 		{
 			spawnpuff = (puffclass != NULL);
 		}
@@ -4138,7 +4138,10 @@ void P_RailAttack(AActor *source, int damage, int offset_xy, fixed_t offset_z, i
 		{
 			P_PoisonMobj(hitactor, thepuff ? thepuff : source, source, puffDefaults->PoisonDamage, puffDefaults->PoisonDuration, puffDefaults->PoisonPeriod, puffDefaults->PoisonDamageType);
 		}
-		int newdam = P_DamageMobj(hitactor, thepuff ? thepuff : source, source, damage, damagetype, DMG_INFLICTOR_IS_PUFF);
+		int dmgFlagPass = DMG_INFLICTOR_IS_PUFF;
+		dmgFlagPass += (puffDefaults->flags3 & MF3_FOILINVUL) ? DMG_FOILINVUL : 0; //[MC]Because the original foilinvul check wasn't working.
+		dmgFlagPass += (puffDefaults->flags7 & MF7_FOILBUDDHA) ? DMG_FOILBUDDHA : 0;
+		int newdam = P_DamageMobj(hitactor, thepuff ? thepuff : source, source, damage, damagetype, dmgFlagPass);
 		if (bleed)
 		{
 			P_SpawnBlood(x, y, z, (source->angle + angleoffset) - ANG180, newdam > 0 ? newdam : damage, hitactor);
@@ -4685,7 +4688,7 @@ void P_RadiusAttack(AActor *bombspot, AActor *bombsource, int bombdamage, int bo
 
 				if (!(flags & RADF_NODAMAGE))
 					newdam = P_DamageMobj(thing, bombspot, bombsource, damage, bombmod);
-				else if (thing->player == NULL && !(flags & RADF_NOIMPACTDAMAGE))
+				else if (thing->player == NULL && (!(flags & RADF_NOIMPACTDAMAGE) && !(thing->flags7 & MF7_DONTTHRUST)))
 					thing->flags2 |= MF2_BLASTED;
 
 				if (!(thing->flags & MF_ICECORPSE))
@@ -4697,25 +4700,29 @@ void P_RadiusAttack(AActor *bombspot, AActor *bombsource, int bombdamage, int bo
 					{
 						if (bombsource == NULL || !(bombsource->flags2 & MF2_NODMGTHRUST))
 						{
-							thrust = points * 0.5f / (double)thing->Mass;
-							if (bombsource == thing)
+							if (!(thing->flags7 & MF7_DONTTHRUST))
 							{
-								thrust *= selfthrustscale;
+							
+								thrust = points * 0.5f / (double)thing->Mass;
+								if (bombsource == thing)
+								{
+									thrust *= selfthrustscale;
+								}
+								velz = (double)(thing->z + (thing->height >> 1) - bombspot->z) * thrust;
+								if (bombsource != thing)
+								{
+									velz *= 0.5f;
+								}
+								else
+								{
+									velz *= 0.8f;
+								}
+								angle_t ang = R_PointToAngle2(bombspot->x, bombspot->y, thing->x, thing->y) >> ANGLETOFINESHIFT;
+								thing->velx += fixed_t(finecosine[ang] * thrust);
+								thing->vely += fixed_t(finesine[ang] * thrust);
+								if (!(flags & RADF_NODAMAGE))
+									thing->velz += (fixed_t)velz;	// this really doesn't work well
 							}
-							velz = (double)(thing->z + (thing->height >> 1) - bombspot->z) * thrust;
-							if (bombsource != thing)
-							{
-								velz *= 0.5f;
-							}
-							else
-							{
-								velz *= 0.8f;
-							}
-							angle_t ang = R_PointToAngle2(bombspot->x, bombspot->y, thing->x, thing->y) >> ANGLETOFINESHIFT;
-							thing->velx += fixed_t(finecosine[ang] * thrust);
-							thing->vely += fixed_t(finesine[ang] * thrust);
-							if (!(flags & RADF_NODAMAGE))
-								thing->velz += (fixed_t)velz;	// this really doesn't work well
 						}
 					}
 				}
