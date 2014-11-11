@@ -65,7 +65,7 @@ struct doomcom_t
 // communication between DOOM and the driver
 	SWORD	command;		// CMD_SEND or CMD_GET
 	SWORD	remotenode;		// dest for send, set by get (-1 = no packet).
-	SWORD	datalength;		// bytes in doomdata to be sent
+	DWORD	datalength;		// bytes in doomdata to be sent
 
 // info common to all nodes
 	SWORD	numnodes;		// console is always node 0.
