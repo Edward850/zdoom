@@ -482,7 +482,7 @@ extern bool savegamerestore;
 // mapname will be changed if it is a valid warptrans
 bool CheckWarpTransMap (FString &mapname, bool substitute);
 
-void G_InitNew (const char *mapname, bool bTitleLevel);
+void G_InitNew (const char *mapname, bool bTitleLevel, bool reload = false);
 
 // Can be called by the startup code or M_Responder.
 // A normal game starts at map 1,

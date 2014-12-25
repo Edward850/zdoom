@@ -178,7 +178,16 @@ BYTE*			demobodyspot;
 size_t			maxdemosize;
 BYTE*			zdemformend;			// end of FORM ZDEM chunk
 BYTE*			zdembodyend;			// end of ZDEM BODY chunk
-bool 			singledemo; 			// quit after playing a demo from cmdline 
+bool 			singledemo; 			// quit after playing a demo from cmdline
+
+size_t			t_maxsize;
+BYTE*			t_inputbuffer;
+BYTE*			t_input_p;
+bool			t_record = true;
+bool			t_shift = false;
+int				t_shiftto = -1;
+void G_WriteTemporalTiccmd(ticcmd_t *cmd, int player, int buf);
+void G_ReadTemporalTiccmd(ticcmd_t *cmd, int player);
  
 bool 			precache = true;		// if true, load all graphics at start 
  
@@ -1147,6 +1156,10 @@ void G_Ticker ()
 			{
 				G_WriteDemoTiccmd (newcmd, i, buf);
 			}
+
+			if (gamestate == GS_LEVEL && t_record && !P_CheckTickerPaused())
+				G_WriteTemporalTiccmd(newcmd, i, buf);
+
 			players[i].oldbuttons = cmd->ucmd.buttons;
 			// If the user alt-tabbed away, paused gets set to -1. In this case,
 			// we do not want to read more demo commands until paused is no
@@ -1195,6 +1208,34 @@ void G_Ticker ()
 	case GS_LEVEL:
 		P_Ticker ();
 		AM_Ticker ();
+
+		if (t_shift)
+		{
+			I_FreezeTime(true);
+
+			t_input_p = t_inputbuffer;
+
+			G_InitNew(level.MapName, false, true);
+
+			while (level.time < t_shiftto)
+			{
+				for (i = 0; i < MAXPLAYERS; i++)
+				{
+					if (playeringame[i])
+					{
+						ticcmd_t *cmd = &players[i].cmd;
+
+						players[i].oldbuttons = cmd->ucmd.buttons;
+
+						G_ReadTemporalTiccmd(cmd, i);
+					}
+				}
+
+				P_Ticker();
+			}
+
+			I_FreezeTime(false);
+		}
 		break;
 
 	case GS_TITLELEVEL:
@@ -1224,6 +1265,7 @@ void G_Ticker ()
 	default:
 		break;
 	}
+	t_shift = false;
 }
 
 
@@ -2823,4 +2865,90 @@ bool G_CheckDemoStatus (void)
 	}
 
 	return false; 
+}
+
+CCMD(rewind)
+{
+	int sec = 10;
+
+	if (argv.argc() > 1)
+		sec = atoi(argv[1]);
+
+	t_shift = true;
+	t_shiftto = MAX(0, level.time - (TICRATE * sec));
+}
+
+void G_RecordTemporal()
+{
+	t_maxsize = 0x20000;
+	t_inputbuffer = (BYTE *)M_Malloc(t_maxsize);
+	t_input_p = t_inputbuffer;
+}
+
+void G_ReadTemporalTiccmd(ticcmd_t *cmd, int player)
+{
+	int id = DEM_BAD;
+
+	while (id != DEM_USERCMD && id != DEM_EMPTYUSERCMD)
+	{
+		id = ReadByte(&t_input_p);
+
+		switch (id)
+		{
+		case DEM_USERCMD:
+			UnpackUserCmd(&cmd->ucmd, &cmd->ucmd, &t_input_p);
+			break;
+
+		case DEM_EMPTYUSERCMD:
+			// leave cmd->ucmd unchanged
+			break;
+
+		case DEM_DROPPLAYER:
+		{
+			BYTE i = ReadByte(&demo_p);
+			if (i < MAXPLAYERS)
+			{
+				playeringame[i] = false;
+			}
+		}
+		break;
+
+		default:
+			Net_DoCommand(id, &t_input_p, player);
+			break;
+		}
+	}
+}
+
+void G_WriteTemporalTiccmd(ticcmd_t *cmd, int player, int buf)
+{
+	if (t_inputbuffer == NULL)
+		G_RecordTemporal();
+
+	// Write any special "ticcmds" for this player to the buffer
+	BYTE *specdata;
+	int speclen;
+	if ((specdata = NetSpecs[player][buf].GetData(&speclen)) && gametic % ticdup == 0)
+	{
+		memcpy(t_input_p, specdata, speclen);
+		t_input_p += speclen;
+		NetSpecs[player][buf].SetData(NULL, 0);
+	}
+
+	// Now write out a "normal" ticcmd.
+	WriteUserCmdMessage(&cmd->ucmd, &players[player].cmd.ucmd, &t_input_p);
+
+	// Bigger safety margin
+	// [ED850] Holy crap, why do I think this could 
+	// corrupt somehow if done /after/ the data has been written?
+	assert(!(t_input_p > t_inputbuffer + t_maxsize));
+	if (t_input_p > t_inputbuffer + t_maxsize - 64)
+	{
+		ptrdiff_t pos = t_input_p - t_inputbuffer;
+
+		// Allocate more space
+		t_maxsize += 0x20000;
+		t_inputbuffer = (BYTE *)M_Realloc(t_inputbuffer, t_maxsize);
+		t_input_p = t_inputbuffer + pos;
+	}
 }

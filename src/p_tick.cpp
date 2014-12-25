@@ -44,7 +44,7 @@ extern gamestate_t wipegamestate;
 // paused, then it returns false but does not unpause anything.
 //
 //==========================================================================
-
+extern bool t_record;
 bool P_CheckTickerPaused ()
 {
 	// pause if in menu or console and at least one tic has been run
@@ -55,7 +55,8 @@ bool P_CheckTickerPaused ()
 		 && !demoplayback
 		 && !demorecording
 		 && players[consoleplayer].viewz != 1
-		 && wipegamestate == gamestate)
+		 && wipegamestate == gamestate
+		 && !t_record)
 	{
 		S_PauseSound (!(level.flags2 & LEVEL2_PAUSE_MUSIC_IN_MENUS), false);
 		return true;

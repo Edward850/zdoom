@@ -360,12 +360,13 @@ static void InitPlayerClasses ()
 	}
 }
 
+extern int		NoWipe;		// [RH] Don't wipe when travelling in hubs
 //==========================================================================
 //
 //
 //==========================================================================
 
-void G_InitNew (const char *mapname, bool bTitleLevel)
+void G_InitNew (const char *mapname, bool bTitleLevel, bool reload)
 {
 	EGameSpeed oldSpeed;
 	bool wantFast;
@@ -460,7 +461,7 @@ void G_InitNew (const char *mapname, bool bTitleLevel)
 
 	if (!savegamerestore)
 	{
-		if (!netgame && !demorecording && !demoplayback)
+		if (!netgame && !demorecording && !demoplayback && !reload)
 		{
 			// [RH] Change the random seed for each new single player game
 			// [ED850] The demo already sets the RNG.
@@ -507,6 +508,7 @@ void G_InitNew (const char *mapname, bool bTitleLevel)
 		gamestate = GS_LEVEL;
 	}
 	G_DoLoadLevel (0, false);
+	if (reload) NoWipe = 1;
 }
 
 //
@@ -514,7 +516,6 @@ void G_InitNew (const char *mapname, bool bTitleLevel)
 //
 static FString	nextlevel;
 static int		startpos;	// [RH] Support for multiple starts per level
-extern int		NoWipe;		// [RH] Don't wipe when travelling in hubs
 static int		changeflags;
 static bool		unloading;
 
