@@ -39,24 +39,28 @@
 #include "basictypes.h"
 #include "sfmt/SFMT.h"
 
+int P_Random(void);
+
 struct PNGHandle;
 
 class FRandom
 {
 public:
 	FRandom ();
-	FRandom (const char *name);
+	FRandom (const char *name, bool useOld = false);
 	~FRandom ();
 
 	// Returns a random number in the range [0,255]
 	int operator()()
 	{
+		if (useOldRNG) return P_Random();
 		return GenRand32() & 255;
 	}
 
 	// Returns a random number in the range [0,mod)
 	int operator() (int mod)
 	{
+		if (useOldRNG) return P_Random() % mod;
 		return GenRand32() % mod;
 	}
 
@@ -69,8 +73,17 @@ public:
 // Returns (rand# & mask) - (rand# & mask)
 	int Random2(int mask)
 	{
-		int t = GenRand32() & mask & 255;
-		return t - (GenRand32() & mask & 255);
+		int t;
+		if (useOldRNG)
+		{
+			t = P_Random() & mask & 255;
+			return t - (P_Random() & mask & 255);
+		}
+		else
+		{
+			t = GenRand32() & mask & 255;
+			return t - (GenRand32() & mask & 255);
+		}
 	}
 
 	// HITDICE macro used in Heretic and Hexen
@@ -206,6 +219,10 @@ private:
 	} sfmt;
 	/** index counter to the 32-bit internal state array */
 	int idx;
+
+	// Use the old PRNG table if/when requested
+	bool useOldRNG;
+
 	/** a flag: it is 0 if and only if the internal state is not yet
 	 * initialized. */
 #ifndef NDEBUG
