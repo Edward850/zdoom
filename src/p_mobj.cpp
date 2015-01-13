@@ -89,13 +89,13 @@ EXTERN_CVAR (Int,  cl_rockettrails)
 
 // PRIVATE DATA DEFINITIONS ------------------------------------------------
 
-static FRandom pr_explodemissile ("ExplodeMissile");
+static FRandom pr_explodemissile ("ExplodeMissile", true);
 FRandom pr_bounce ("Bounce");
 static FRandom pr_reflect ("Reflect");
 static FRandom pr_nightmarerespawn ("NightmareRespawn");
 static FRandom pr_botspawnmobj ("BotSpawnActor");
 static FRandom pr_spawnmapthing ("SpawnMapThing");
-static FRandom pr_spawnpuff ("SpawnPuff");
+static FRandom pr_spawnpuff ("SpawnPuff", true);
 static FRandom pr_spawnblood ("SpawnBlood");
 static FRandom pr_splatter ("BloodSplatter");
 static FRandom pr_takedamage ("TakeDamage");
@@ -111,7 +111,7 @@ static FRandom pr_uniquetid("UniqueTID");
 
 // PUBLIC DATA DEFINITIONS -------------------------------------------------
 
-FRandom pr_spawnmobj ("SpawnActor");
+FRandom pr_spawnmobj ("SpawnActor", true);
 
 CUSTOM_CVAR (Float, sv_gravity, 800.f, CVAR_SERVERINFO|CVAR_NOSAVE)
 {
@@ -3915,14 +3915,15 @@ AActor *AActor::StaticSpawn (const PClass *type, fixed_t ix, fixed_t iy, fixed_t
 	// Actors with zero gravity need the NOGRAVITY flag set.
 	if (actor->gravity == 0) actor->flags |= MF_NOGRAVITY;
 
-	FRandom &rng = bglobal.m_Thinking ? pr_botspawnmobj : pr_spawnmobj;
+	int spawnrng = bglobal.m_Thinking ? pr_botspawnmobj() : pr_spawnmobj();
+
 
 	if (actor->isFast() && actor->flags3 & MF3_ISMONSTER)
 		actor->reactiontime = 0;
 
 	if (actor->flags3 & MF3_ISMONSTER)
 	{
-		actor->LastLookPlayerNumber = rng() % MAXPLAYERS;
+		actor->LastLookPlayerNumber = spawnrng % MAXPLAYERS;
 		actor->TIDtoHate = 0;
 	}
 
@@ -4006,7 +4007,7 @@ AActor *AActor::StaticSpawn (const PClass *type, fixed_t ix, fixed_t iy, fixed_t
 		if (space > 48*FRACUNIT)
 		{
 			space -= 40*FRACUNIT;
-			actor->z = MulScale8 (space, rng()) + actor->floorz + 40*FRACUNIT;
+			actor->z = MulScale8(space, spawnrng) + actor->floorz + 40 * FRACUNIT;
 		}
 		else
 		{
@@ -4018,7 +4019,7 @@ AActor *AActor::StaticSpawn (const PClass *type, fixed_t ix, fixed_t iy, fixed_t
 		actor->SpawnPoint[2] = (actor->z - actor->floorz);
 	}
 
-	if (actor->FloatBobPhase == (BYTE)-1) actor->FloatBobPhase = rng();	// Don't make everything bob in sync (unless deliberately told to do)
+	if (actor->FloatBobPhase == (BYTE)-1) actor->FloatBobPhase = spawnrng;	// Don't make everything bob in sync (unless deliberately told to do)
 	if (actor->flags2 & MF2_FLOORCLIP)
 	{
 		actor->AdjustFloorClip ();
