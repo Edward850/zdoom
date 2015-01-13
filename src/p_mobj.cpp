@@ -94,7 +94,7 @@ FRandom pr_bounce ("Bounce");
 static FRandom pr_reflect ("Reflect");
 static FRandom pr_nightmarerespawn ("NightmareRespawn", true);
 static FRandom pr_botspawnmobj ("BotSpawnActor");
-static FRandom pr_spawnmapthing ("SpawnMapThing");
+static FRandom pr_spawnmapthing ("SpawnMapThing", true);
 static FRandom pr_spawnpuff ("SpawnPuff", true);
 static FRandom pr_spawnblood ("SpawnBlood", true);
 static FRandom pr_splatter ("BloodSplatter");
