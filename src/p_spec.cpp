@@ -70,7 +70,7 @@
 
 #include "r_data/r_interpolate.h"
 
-static FRandom pr_playerinspecialsector ("PlayerInSpecialSector");
+static FRandom pr_playerinspecialsector ("PlayerInSpecialSector", true);
 void P_SetupPortals();
 
 EXTERN_CVAR(Bool, cl_predict_specials)

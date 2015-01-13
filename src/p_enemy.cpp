@@ -48,15 +48,16 @@
 
 #include "gi.h"
 
-static FRandom pr_checkmissilerange ("CheckMissileRange");
+static FRandom pr_checkmissilerange ("CheckMissileRange", true);
 static FRandom pr_opendoor ("OpenDoor");
-static FRandom pr_trywalk ("TryWalk");
-static FRandom pr_newchasedir ("NewChaseDir");
+static FRandom pr_trywalk ("TryWalk", true);
+static FRandom pr_newchasedir ("NewChaseDir", true);
 static FRandom pr_lookformonsters ("LookForMonsters");
 static FRandom pr_lookforplayers ("LookForPlayers");
 static FRandom pr_scaredycat ("Anubis");
-	   FRandom pr_chase ("Chase");
-static FRandom pr_facetarget ("FaceTarget");
+	   FRandom pr_chase ("Chase", true);
+static FRandom pr_fastchase("FastChase");
+static FRandom pr_facetarget ("FaceTarget", true);
 static FRandom pr_railface ("RailFace");
 static FRandom pr_dropitem ("DropItem");
 static FRandom pr_look2 ("LookyLooky");
@@ -2381,10 +2382,10 @@ void A_DoChase (AActor *actor, bool fastchase, FState *meleestate, FState *missi
 			fixed_t dist = P_AproxDistance (actor->x - actor->target->x, actor->y - actor->target->y);
 			if (dist < CLASS_BOSS_STRAFE_RANGE)
 			{
-				if (pr_chase() < 100)
+				if (pr_fastchase() < 100)
 				{
 					angle_t ang = R_PointToAngle2(actor->x, actor->y, actor->target->x, actor->target->y);
-					if (pr_chase() < 128) ang += ANGLE_90;
+					if (pr_fastchase() < 128) ang += ANGLE_90;
 					else ang -= ANGLE_90;
 					actor->velx = 13 * finecosine[ang>>ANGLETOFINESHIFT];
 					actor->vely = 13 * finesine[ang>>ANGLETOFINESHIFT];

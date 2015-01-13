@@ -12,9 +12,10 @@
 #include "g_level.h"
 */
 
-static FRandom pr_brainscream ("BrainScream");
-static FRandom pr_brainexplode ("BrainExplode");
+static FRandom pr_brainscream ("BrainScream", true);
+static FRandom pr_brainexplode ("BrainExplode", true);
 static FRandom pr_spawnfly ("SpawnFly");
+static FRandom pr_spawnflyold ("SpawnFlyOld", true);
 
 DEFINE_ACTION_FUNCTION(AActor, A_BrainAwake)
 {
@@ -237,7 +238,7 @@ static void SpawnFly(AActor *self, const PClass *spawntype, FSoundID sound)
 	if (SpawnName == NAME_None)
 	{
 		// Randomly select monster to spawn.
-		r = pr_spawnfly ();
+		r = pr_spawnflyold();
 
 		// Probability distribution (kind of :),
 		// decreasing likelihood.

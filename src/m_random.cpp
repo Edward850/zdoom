@@ -175,10 +175,24 @@ static TDeletingArray<FRandom *> NewRNGs;
 //
 //==========================================================================
 
-int P_Random(void)
+unsigned int P_Random(void)
 {
 	oldrngindex = (++oldrngindex) & 0xFF;
 	return oldrndtable[oldrngindex];
+}
+
+//==========================================================================
+//
+// FRandom::GetRandom()
+//
+// Returns either an old PRNG value or an SFMT value
+//
+//==========================================================================
+
+unsigned int FRandom::GetRandom()
+{
+	if (useOldRNG && (compatflags2 & COMPATF2_OLDRNG)) return P_Random();
+	else return GenRand32();
 }
 
 //==========================================================================
@@ -344,7 +358,7 @@ void FRandom::StaticWriteRNGState (FILE *file)
 	FPNGChunkArchive arc (file, RAND_ID);
 
 	arc << rngseed;
-	//arc << oldrngindex;
+	if (SaveVersion >= 4519) arc << oldrngindex;
 
 	for (rng = FRandom::RNGList; rng != NULL; rng = rng->Next)
 	{
@@ -385,8 +399,8 @@ void FRandom::StaticReadRNGState (PNGHandle *png)
 		FPNGChunkArchive arc (png->File->GetFile(), RAND_ID, len);
 
 		arc << rngseed;
-		//arc << oldrngindex;
 		FRandom::StaticClearRandom ();
+		if (SaveVersion >= 4519) arc << oldrngindex;
 
 		for (i = rngcount; i; --i)
 		{

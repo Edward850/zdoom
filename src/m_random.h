@@ -39,8 +39,6 @@
 #include "basictypes.h"
 #include "sfmt/SFMT.h"
 
-int P_Random(void);
-
 struct PNGHandle;
 
 class FRandom
@@ -53,15 +51,13 @@ public:
 	// Returns a random number in the range [0,255]
 	int operator()()
 	{
-		if (useOldRNG) return P_Random();
-		return GenRand32() & 255;
+		return GetRandom() & 255;
 	}
 
 	// Returns a random number in the range [0,mod)
 	int operator() (int mod)
 	{
-		if (useOldRNG) return P_Random() % mod;
-		return GenRand32() % mod;
+		return GetRandom() % mod;
 	}
 
 	// Returns rand# - rand#
@@ -73,23 +69,14 @@ public:
 // Returns (rand# & mask) - (rand# & mask)
 	int Random2(int mask)
 	{
-		int t;
-		if (useOldRNG)
-		{
-			t = P_Random() & mask & 255;
-			return t - (P_Random() & mask & 255);
-		}
-		else
-		{
-			t = GenRand32() & mask & 255;
-			return t - (GenRand32() & mask & 255);
-		}
+		int t = GetRandom() & mask & 255;
+		return t - (GetRandom() & mask & 255);
 	}
 
 	// HITDICE macro used in Heretic and Hexen
 	int HitDice(int count)
 	{
-		return (1 + (GenRand32() & 7)) * count;
+		return (1 + (GetRandom() & 7)) * count;
 	}
 
 	int Random()				// synonym for ()
@@ -98,6 +85,7 @@ public:
 	}
 
 	void Init(DWORD seed);
+	unsigned int GetRandom();
 
 	// SFMT interface
 	unsigned int GenRand32();

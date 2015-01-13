@@ -87,7 +87,7 @@
 #include "g_hub.h"
 
 
-static FRandom pr_dmspawn ("DMSpawn");
+static FRandom pr_dmspawn ("DMSpawn", true);
 static FRandom pr_pspawn ("PlayerSpawn");
 
 const int SAVEPICWIDTH = 216;

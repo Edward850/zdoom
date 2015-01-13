@@ -32,7 +32,7 @@
 #include "gi.h"
 #include "farchive.h"
 
-static FRandom pr_doplat ("DoPlat");
+static FRandom pr_doplat ("DoPlat", true);
 
 IMPLEMENT_CLASS (DPlat)
 

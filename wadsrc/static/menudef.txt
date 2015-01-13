@@ -1304,6 +1304,7 @@ OptionMenu "CompatibilityOptions"
 	Option "Cannot travel straight NSEW",				"compat_badangles", "YesNo"
 	Option "Use Doom's floor motion behavior",			"compat_floormove", "YesNo"
 	Option "Sounds stop when actor vanishes",			"compat_soundcutoff", "YesNo"
+	Option "Use Vanilla Doom's Psudo Random Numbers",	"compat_oldrng", "YesNo"
 	
 	Class "CompatibilityMenu"
 }
