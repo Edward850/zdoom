@@ -108,6 +108,7 @@ static FRandom pr_missiledamage ("MissileDamage", true);
 static FRandom pr_multiclasschoice ("MultiClassChoice");
 static FRandom pr_rockettrail("RocketTrail");
 static FRandom pr_uniquetid("UniqueTID");
+static FRandom pr_spawnbob("SpawnActorBob");
 
 // PUBLIC DATA DEFINITIONS -------------------------------------------------
 
@@ -3915,17 +3916,20 @@ AActor *AActor::StaticSpawn (const PClass *type, fixed_t ix, fixed_t iy, fixed_t
 	// Actors with zero gravity need the NOGRAVITY flag set.
 	if (actor->gravity == 0) actor->flags |= MF_NOGRAVITY;
 
-	int spawnrng = bglobal.m_Thinking ? pr_botspawnmobj() : pr_spawnmobj();
-
+	// [ED850] Bots never seem to actually spawn anything (unfinished bot node logic?), so I would say it's safe to remove the RNG.
+	assert(!bglobal.m_Thinking);
 
 	if (actor->isFast() && actor->flags3 & MF3_ISMONSTER)
 		actor->reactiontime = 0;
 
 	if (actor->flags3 & MF3_ISMONSTER)
 	{
-		actor->LastLookPlayerNumber = spawnrng % MAXPLAYERS;
+		actor->LastLookPlayerNumber = pr_spawnmobj() % MAXPLAYERS;
 		actor->TIDtoHate = 0;
 	}
+	// [ED850] The SSG uses a lot of RNG calls per shot. Part of it is because every puff called then RNG 3 times itself.
+	// Thus, this is here simply to mirror the number of calls to the PRNG.
+	else pr_spawnmobj();
 
 	// Set the state, but do not use SetState, because action
 	// routines can't be called yet.  If the spawnstate has an action
@@ -4007,7 +4011,7 @@ AActor *AActor::StaticSpawn (const PClass *type, fixed_t ix, fixed_t iy, fixed_t
 		if (space > 48*FRACUNIT)
 		{
 			space -= 40*FRACUNIT;
-			actor->z = MulScale8(space, spawnrng) + actor->floorz + 40 * FRACUNIT;
+			actor->z = MulScale8(space, pr_spawnbob()) + actor->floorz + 40 * FRACUNIT;
 		}
 		else
 		{
@@ -4019,7 +4023,7 @@ AActor *AActor::StaticSpawn (const PClass *type, fixed_t ix, fixed_t iy, fixed_t
 		actor->SpawnPoint[2] = (actor->z - actor->floorz);
 	}
 
-	if (actor->FloatBobPhase == (BYTE)-1) actor->FloatBobPhase = spawnrng;	// Don't make everything bob in sync (unless deliberately told to do)
+	if (actor->FloatBobPhase == (BYTE)-1) actor->FloatBobPhase = pr_spawnbob();	// Don't make everything bob in sync (unless deliberately told to do)
 	if (actor->flags2 & MF2_FLOORCLIP)
 	{
 		actor->AdjustFloorClip ();
