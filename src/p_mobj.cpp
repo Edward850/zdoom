@@ -94,7 +94,7 @@ FRandom pr_bounce ("Bounce");
 static FRandom pr_reflect ("Reflect");
 static FRandom pr_nightmarerespawn ("NightmareRespawn", true);
 static FRandom pr_botspawnmobj ("BotSpawnActor");
-static FRandom pr_spawnmapthing ("SpawnMapThing", true);
+static FRandom pr_spawnmapthing ("SpawnMapThing");
 static FRandom pr_spawnpuff ("SpawnPuff", true);
 static FRandom pr_spawnblood ("SpawnBlood", true);
 static FRandom pr_splatter ("BloodSplatter");
@@ -4959,14 +4959,6 @@ AActor *P_SpawnPuff (AActor *source, const PClass *pufftype, fixed_t x, fixed_t 
 
 	puff = Spawn (pufftype, x, y, z, ALLOW_REPLACE);
 	if (puff == NULL) return NULL;
-
-	// [ED850] Remember to remove this later to prevent conflicts.
-	if ((puff->flags4 & MF4_RANDOMIZE) && puff->tics > 0)
-	{
-		puff->tics -= pr_spawnpuff() & 3;
-		if (puff->tics < 1)
-			puff->tics = 1;
-	}
 
 	//Moved puff creation and target/master/tracer setting to here. 
 	if (puff && vict)
