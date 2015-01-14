@@ -295,17 +295,10 @@ DEFINE_ACTION_FUNCTION(AActor, A_FireShotgun2)
 
 
 	angle_t pitch = P_BulletSlope (self);
-
-#ifdef _DEBUG
-	int SSGDMG[20];
-#endif
 		
 	for (i=0 ; i<20 ; i++)
 	{
 		damage = 5*(pr_fireshotgun2()%3+1);
-#ifdef _DEBUG
-		SSGDMG[i] = damage;
-#endif
 		angle = self->angle;
 		angle += pr_fireshotgun2.Random2() << 19;
 
@@ -321,11 +314,6 @@ DEFINE_ACTION_FUNCTION(AActor, A_FireShotgun2)
 					  pitch + (pr_fireshotgun2.Random2() * 332063), damage,
 					  NAME_Hitscan, NAME_BulletPuff);
 	}
-#ifdef _DEBUG
-	Printf("A_FireShotgun2 @ %d (%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d)\n", gametic,
-		SSGDMG[0], SSGDMG[1], SSGDMG[2], SSGDMG[3], SSGDMG[4], SSGDMG[5], SSGDMG[6], SSGDMG[7], SSGDMG[8], SSGDMG[9],
-		SSGDMG[10], SSGDMG[11], SSGDMG[12], SSGDMG[13], SSGDMG[14], SSGDMG[15], SSGDMG[16], SSGDMG[17], SSGDMG[18], SSGDMG[19]);
-#endif
 }
 
 DEFINE_ACTION_FUNCTION(AActor, A_OpenShotgun2)
