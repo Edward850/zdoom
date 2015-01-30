@@ -665,6 +665,7 @@ OptionMenu "VideoOptions"
 	Slider "Screen size",				"screenblocks", 3.0, 12.0, 1.0, 0
 	Slider "Brightness",				"Gamma", 0.75, 3.0, 0.05, 2
 	Option "Vertical Sync",				"vid_vsync", "OnOff"
+	Option "Rendering Interpolation",	"cl_capfps", "OffOn"
 	Option "Column render mode",		"r_columnmethod", "ColumnMethods"
 
 	StaticText " "
@@ -685,6 +686,7 @@ OptionMenu "VideoOptions"
 	Option "Blood Type",				"cl_bloodtype", "BloodTypes"
 	Option "Bullet Puff Type",			"cl_pufftype", "PuffTypes"
 	Slider "Number of particles",		"r_maxparticles", 100, 10000, 100, 0
+	Slider "Number of decals",			"cl_maxdecals", 0, 10000, 100, 0
 	Option "Show player sprites",		"r_drawplayersprites", "OnOff"
 	Option "Death camera",				"r_deathcamera", "OnOff"
 	Option "Teleporter zoom",			"telezoom", "OnOff"
@@ -1478,6 +1480,7 @@ OptionValue OplCores
 	0, "MAME OPL2"
 	1, "DOSBox OPL3"
 	2, "Java OPL3"
+	3, "Nuked OPL3"
 }
 
 OptionMenu AdvSoundOptions
@@ -1583,6 +1586,10 @@ OptionMenu VideoModeMenu
 	Title "VIDEO MODE"
 	
 	Option "Fullscreen",			"fullscreen", "YesNo"
+	IfOption(Mac)
+	{
+		Option "Retina/HiDPI support", "vid_hidpi", "YesNo"
+	}
 	Option "Aspect ratio",			"menu_screenratios", "Ratios"
 	Option "Force aspect ratio",	"vid_aspect", "ForceRatios"
 	Option "Enable 5:4 aspect ratio","vid_tft", "YesNo"

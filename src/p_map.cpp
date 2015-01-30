@@ -77,6 +77,69 @@ msecnode_t* sector_list = NULL;		// phares 3/16/98
 
 //==========================================================================
 //
+// GetCoefficientClosestPointInLine24
+//
+// Formula: (dotProduct(ldv1 - tm, ld) << 24) / dotProduct(ld, ld)
+// with: ldv1 = (ld->v1->x, ld->v1->y), tm = (tm.x, tm.y)
+// and ld = (ld->dx, ld->dy)
+// Returns truncated to range [0, 1 << 24].
+//
+//==========================================================================
+
+static fixed_t GetCoefficientClosestPointInLine24(line_t *ld, FCheckPosition &tm)
+{
+	// [EP] Use 64 bit integers in order to keep the exact result of the
+	// multiplication, because in the case the vertexes have both the
+	// distance coordinates equal to the map limit (32767 units, which is
+	// 2147418112 in fixed_t notation), the product result would occupy
+	// 62 bits and the sum of two products would occupy 63 bits
+	// in the worst case. If instead the vertexes are very close (1 in
+	// fixed_t notation, which is 1.52587890625e-05 in float notation), the
+	// product and the sum can be 1 in the worst case, which is very tiny.
+
+	SQWORD r_num = ((SQWORD(tm.x - ld->v1->x)*ld->dx) +
+					(SQWORD(tm.y - ld->v1->y)*ld->dy));
+
+	// The denominator is always positive. Use this to avoid useless
+	// calculations.
+	SQWORD r_den = (SQWORD(ld->dx)*ld->dx + SQWORD(ld->dy)*ld->dy);
+
+	if (r_num <= 0) {
+		// [EP] The numerator is less or equal to zero, hence the closest
+		// point on the line is the first vertex. Truncate the result to 0.
+		return 0;
+	}
+
+	if (r_num >= r_den) {
+		// [EP] The division is greater or equal to 1, hence the closest
+		// point on the line is the second vertex. Truncate the result to
+		// 1 << 24.
+		return (1 << 24);
+	}
+
+	// [EP] Deal with the limited bits. The original formula is:
+	// r = (r_num << 24) / r_den,
+	// but r_num might be big enough to make the shift overflow.
+	// Since the numerator can't be saved in a 128bit integer,
+	// the denominator must be right shifted. If the denominator is
+	// less than (1 << 24), there would be a division by zero.
+	// Thanks to the fact that in this code path the denominator is greater
+	// than the numerator, it's possible to avoid this bad situation by
+	// just checking the last 24 bits of the numerator.
+	if ((r_num >> (63-24)) != 0) {
+		// [EP] In fact, if the numerator is greater than
+		// (1 << (63-24)), the denominator must be greater than
+		// (1 << (63-24)), hence the denominator won't be zero after
+		// the right shift by 24 places.
+		return (fixed_t)(r_num/(r_den >> 24));
+	}
+	// [EP] Having the last 24 bits all zero allows left shifting
+	// the numerator by 24 bits without overflow.
+	return (fixed_t)((r_num << 24)/r_den);
+}
+
+//==========================================================================
+//
 // PIT_FindFloorCeiling
 //
 // only3d set means to only check against 3D floors and midtexes.
@@ -740,11 +803,8 @@ bool PIT_CheckLine(line_t *ld, const FBoundingBox &box, FCheckPosition &tm)
 	else
 	{ // Find the point on the line closest to the actor's center, and use
 		// that to calculate openings
-		float dx = (float)ld->dx;
-		float dy = (float)ld->dy;
-		fixed_t r = (fixed_t)(((float)(tm.x - ld->v1->x) * dx +
-			(float)(tm.y - ld->v1->y) * dy) /
-			(dx*dx + dy*dy) * 16777216.f);
+		fixed_t r = GetCoefficientClosestPointInLine24(ld, tm);
+
 		/*		Printf ("%d:%d: %d  (%d %d %d %d)  (%d %d %d %d)\n", level.time, ld-lines, r,
 		ld->frontsector->floorplane.a,
 		ld->frontsector->floorplane.b,
@@ -828,6 +888,20 @@ bool PIT_CheckLine(line_t *ld, const FBoundingBox &box, FCheckPosition &tm)
 		spechit.Push(ld);
 	}
 
+	return true;
+}
+
+
+//==========================================================================
+//
+// Isolated to keep the code readable and fix the logic
+//
+//==========================================================================
+
+static bool CheckRipLevel(AActor *victim, AActor *projectile)
+{
+	if (victim->RipLevelMin > 0 && projectile->RipperLevel < victim->RipLevelMin) return false;
+	if (victim->RipLevelMax > 0 && projectile->RipperLevel > victim->RipLevelMax) return false;
 	return true;
 }
 
@@ -1153,7 +1227,8 @@ bool PIT_CheckThing(AActor *thing, FCheckPosition &tm)
 		{
 			return true;
 		}
-		if (tm.DoRipping && !(thing->flags5 & MF5_DONTRIP))
+
+		if ((tm.DoRipping && !(thing->flags5 & MF5_DONTRIP)) && CheckRipLevel(thing, tm.thing))
 		{
 			if (!(tm.thing->flags6 & MF6_NOBOSSRIP) || !(thing->flags2 & MF2_BOSS))
 			{
@@ -1228,6 +1303,16 @@ bool PIT_CheckThing(AActor *thing, FCheckPosition &tm)
 		else
 		{
 			P_GiveBody(thing, -damage);
+		}
+
+		if ((thing->flags7 & MF7_THRUREFLECT) && (thing->flags2 & MF2_REFLECTIVE) && (tm.thing->flags & MF_MISSILE))
+		{
+			if (tm.thing->flags2 & MF2_SEEKERMISSILE)
+			{
+				tm.thing->tracer = tm.thing->target;
+			}
+			tm.thing->target = thing;
+			return true;
 		}
 		return false;		// don't traverse any more
 	}
@@ -1589,7 +1674,7 @@ bool P_TestMobjZ(AActor *actor, bool quick, AActor **pOnmobj)
 		{ // Don't clip against self
 			continue;
 		}
-		if ((actor->flags & MF_MISSILE) && thing == actor->target)
+		if ((actor->flags & MF_MISSILE) && (thing == actor->target))
 		{ // Don't clip against whoever shot the missile.
 			continue;
 		}
@@ -2929,18 +3014,24 @@ bool P_BounceWall(AActor *mo)
 extern FRandom pr_bounce;
 bool P_BounceActor(AActor *mo, AActor *BlockingMobj, bool ontop)
 {
+	//Don't go through all of this if the actor is reflective and wants things to pass through them.
+	if (BlockingMobj && ((BlockingMobj->flags2 & MF2_REFLECTIVE) && (BlockingMobj->flags7 & MF7_THRUREFLECT))) return true;
 	if (mo && BlockingMobj && ((mo->BounceFlags & BOUNCE_AllActors)
-		|| ((mo->flags & MF_MISSILE) && (!(mo->flags2 & MF2_RIP) || (BlockingMobj->flags5 & MF5_DONTRIP) || ((mo->flags6 & MF6_NOBOSSRIP) && (BlockingMobj->flags2 & MF2_BOSS))) && (BlockingMobj->flags2 & MF2_REFLECTIVE))
-		|| ((BlockingMobj->player == NULL) && (!(BlockingMobj->flags3 & MF3_ISMONSTER)))
-		))
+		|| ((mo->flags & MF_MISSILE) && (!(mo->flags2 & MF2_RIP) 
+		|| (BlockingMobj->flags5 & MF5_DONTRIP) 
+		|| ((mo->flags6 & MF6_NOBOSSRIP) && (BlockingMobj->flags2 & MF2_BOSS))) && (BlockingMobj->flags2 & MF2_REFLECTIVE))
+		|| ((BlockingMobj->player == NULL) && (!(BlockingMobj->flags3 & MF3_ISMONSTER)))))
 	{
 		if (mo->bouncecount > 0 && --mo->bouncecount == 0) return false;
+
+		if (mo->flags7 & MF7_HITTARGET)	mo->target = BlockingMobj;
+		if (mo->flags7 & MF7_HITMASTER)	mo->master = BlockingMobj;
+		if (mo->flags7 & MF7_HITTRACER)	mo->tracer = BlockingMobj;
 
 		if (!ontop)
 		{
 			fixed_t speed;
-			angle_t angle = R_PointToAngle2(BlockingMobj->x,
-				BlockingMobj->y, mo->x, mo->y) + ANGLE_1*((pr_bounce() % 16) - 8);
+			angle_t angle = R_PointToAngle2(BlockingMobj->x,BlockingMobj->y, mo->x, mo->y) + ANGLE_1*((pr_bounce() % 16) - 8);
 			speed = P_AproxDistance(mo->velx, mo->vely);
 			speed = FixedMul(speed, mo->wallbouncefactor); // [GZ] was 0.75, using wallbouncefactor seems more consistent
 			mo->angle = angle;
@@ -3680,6 +3771,8 @@ AActor *P_LineAttack(AActor *t1, angle_t angle, fixed_t distance,
 			hity = t1->y + FixedMul(vy, dist);
 			hitz = shootz + FixedMul(vz, dist);
 
+			
+
 			// Spawn bullet puffs or blood spots, depending on target type.
 			if ((puffDefaults != NULL && puffDefaults->flags3 & MF3_PUFFONACTORS) ||
 				(trace.Actor->flags & MF_NOBLOOD) ||
@@ -3689,7 +3782,7 @@ AActor *P_LineAttack(AActor *t1, angle_t angle, fixed_t distance,
 					puffFlags |= PF_HITTHINGBLEED;
 
 				// We must pass the unreplaced puff type here 
-				puff = P_SpawnPuff(t1, pufftype, hitx, hity, hitz, angle - ANG180, 2, puffFlags | PF_HITTHING);
+				puff = P_SpawnPuff(t1, pufftype, hitx, hity, hitz, angle - ANG180, 2, puffFlags | PF_HITTHING, trace.Actor);
 			}
 
 			// Allow puffs to inflict poison damage, so that hitscans can poison, too.
@@ -3701,7 +3794,7 @@ AActor *P_LineAttack(AActor *t1, angle_t angle, fixed_t distance,
 			// [GZ] If MF6_FORCEPAIN is set, we need to call P_DamageMobj even if damage is 0!
 			// Note: The puff may not yet be spawned here so we must check the class defaults, not the actor.
 			int newdam = damage;
-			if (damage || (puffDefaults != NULL && puffDefaults->flags6 & MF6_FORCEPAIN))
+			if (damage || (puffDefaults != NULL && ((puffDefaults->flags6 & MF6_FORCEPAIN) || (puffDefaults->flags7 & MF7_CAUSEPAIN))))
 			{
 				int dmgflags = DMG_INFLICTOR_IS_PUFF | pflag;
 				// Allow MF5_PIERCEARMOR on a weapon as well.
@@ -3710,7 +3803,7 @@ AActor *P_LineAttack(AActor *t1, angle_t angle, fixed_t distance,
 				{
 					dmgflags |= DMG_NO_ARMOR;
 				}
-
+				
 				if (puff == NULL)
 				{
 					// Since the puff is the damage inflictor we need it here 
@@ -4084,7 +4177,7 @@ void P_RailAttack(AActor *source, int damage, int offset_xy, fixed_t offset_z, i
 	int flags;
 
 	assert(puffclass != NULL);		// Because we set it to a default above
-	AActor *puffDefaults = GetDefaultByType(puffclass->GetReplacement());
+	AActor *puffDefaults = GetDefaultByType(puffclass->GetReplacement()); //Contains all the flags such as FOILINVUL, etc.
 
 	flags = (puffDefaults->flags6 & MF6_NOTRIGGER) ? 0 : TRACE_PCross | TRACE_Impact;
 	rail_data.StopAtInvul = (puffDefaults->flags3 & MF3_FOILINVUL) ? false : true;
@@ -4132,8 +4225,9 @@ void P_RailAttack(AActor *source, int damage, int offset_xy, fixed_t offset_z, i
 		}
 		if (spawnpuff)
 		{
-			P_SpawnPuff(source, puffclass, x, y, z, (source->angle + angleoffset) - ANG90, 1, puffflags);
+			P_SpawnPuff(source, puffclass, x, y, z, (source->angle + angleoffset) - ANG90, 1, puffflags, hitactor);
 		}
+		
 		if (puffDefaults && puffDefaults->PoisonDamage > 0 && puffDefaults->PoisonDuration != INT_MIN)
 		{
 			P_PoisonMobj(hitactor, thepuff ? thepuff : source, source, puffDefaults->PoisonDamage, puffDefaults->PoisonDuration, puffDefaults->PoisonPeriod, puffDefaults->PoisonDamageType);
@@ -4142,6 +4236,7 @@ void P_RailAttack(AActor *source, int damage, int offset_xy, fixed_t offset_z, i
 		dmgFlagPass += (puffDefaults->flags3 & MF3_FOILINVUL) ? DMG_FOILINVUL : 0; //[MC]Because the original foilinvul check wasn't working.
 		dmgFlagPass += (puffDefaults->flags7 & MF7_FOILBUDDHA) ? DMG_FOILBUDDHA : 0;
 		int newdam = P_DamageMobj(hitactor, thepuff ? thepuff : source, source, damage, damagetype, dmgFlagPass);
+
 		if (bleed)
 		{
 			P_SpawnBlood(x, y, z, (source->angle + angleoffset) - ANG180, newdam > 0 ? newdam : damage, hitactor);
@@ -4193,7 +4288,7 @@ CVAR(Float, chase_dist, 90.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 void P_AimCamera(AActor *t1, fixed_t &CameraX, fixed_t &CameraY, fixed_t &CameraZ, sector_t *&CameraSector)
 {
-	fixed_t distance = (fixed_t)(chase_dist * FRACUNIT);
+	fixed_t distance = (fixed_t)(clamp<double>(chase_dist, 0, 30000) * FRACUNIT);
 	angle_t angle = (t1->angle - ANG180) >> ANGLETOFINESHIFT;
 	angle_t pitch = (angle_t)(t1->pitch) >> ANGLETOFINESHIFT;
 	FTraceResults trace;
@@ -4203,7 +4298,7 @@ void P_AimCamera(AActor *t1, fixed_t &CameraX, fixed_t &CameraY, fixed_t &Camera
 	vy = FixedMul(finecosine[pitch], finesine[angle]);
 	vz = finesine[pitch];
 
-	sz = t1->z - t1->floorclip + t1->height + (fixed_t)(chase_height * FRACUNIT);
+	sz = t1->z - t1->floorclip + t1->height + (fixed_t)(clamp<double>(chase_height, -1000, 1000) * FRACUNIT);
 
 	if (Trace(t1->x, t1->y, sz, t1->Sector,
 		vx, vy, vz, distance, 0, 0, NULL, trace) &&
@@ -4679,7 +4774,7 @@ void P_RadiusAttack(AActor *bombspot, AActor *bombsource, int bombdamage, int bo
 			points *= thing->GetClass()->Meta.GetMetaFixed(AMETA_RDFactor, FRACUNIT) / (double)FRACUNIT;
 
 			// points and bombdamage should be the same sign
-			if ((points * bombdamage) > 0 && P_CheckSight(thing, bombspot, SF_IGNOREVISIBILITY | SF_IGNOREWATERBOUNDARY))
+			if (((bombspot->flags7 & MF7_CAUSEPAIN) || (points * bombdamage) > 0) && P_CheckSight(thing, bombspot, SF_IGNOREVISIBILITY | SF_IGNOREWATERBOUNDARY))
 			{ // OK to damage; target is in direct path
 				double velz;
 				double thrust;
@@ -5036,6 +5131,8 @@ int P_PushUp(AActor *thing, FChangePosition *cpos)
 		// is normally for projectiles which would have exploded by now anyway...
 		if (thing->flags6 & MF6_THRUSPECIES && thing->GetSpecies() == intersect->GetSpecies())
 			continue;
+		if ((thing->flags & MF_MISSILE) && (intersect->flags2 & MF2_REFLECTIVE) && (intersect->flags7 & MF7_THRUREFLECT))
+			continue;
 		if (!(intersect->flags2 & MF2_PASSMOBJ) ||
 			(!(intersect->flags3 & MF3_ISMONSTER) && intersect->Mass > mymass) ||
 			(intersect->flags4 & MF4_ACTLIKEBRIDGE)
@@ -5044,7 +5141,8 @@ int P_PushUp(AActor *thing, FChangePosition *cpos)
 			// Can't push bridges or things more massive than ourself
 			return 2;
 		}
-		fixed_t oldz = intersect->z;
+		fixed_t oldz;
+		oldz = intersect->z;
 		P_AdjustFloorCeil(intersect, cpos);
 		intersect->z = thing->z + thing->height + 1;
 		if (P_PushUp(intersect, cpos))

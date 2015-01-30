@@ -1581,19 +1581,27 @@ void FBehavior::StaticSerializeModuleStates (FArchive &arc)
 	for (modnum = 0; modnum < StaticModules.Size(); ++modnum)
 	{
 		FBehavior *module = StaticModules[modnum];
+		int ModSize = module->GetDataSize();
 
 		if (arc.IsStoring())
 		{
 			arc.WriteString (module->ModuleName);
+			if (SaveVersion >= 4516) arc << ModSize;
 		}
 		else
 		{
 			char *modname = NULL;
 			arc << modname;
+			if (SaveVersion >= 4516) arc << ModSize;
 			if (stricmp (modname, module->ModuleName) != 0)
 			{
 				delete[] modname;
 				I_Error ("Level was saved with a different set of ACS modules.");
+			}
+			else if (ModSize != module->GetDataSize())
+			{
+				delete[] modname;
+				I_Error("ACS module %s has changed from what was saved. (Have %d bytes, save has %d bytes)", module->ModuleName, module->GetDataSize(), ModSize);
 			}
 			delete[] modname;
 		}
@@ -1873,7 +1881,7 @@ FBehavior::FBehavior (int lumpnum, FileReader * fr, int len)
 				funcm->HasReturnValue = funcf->HasReturnValue;
 				funcm->ImportNum = funcf->ImportNum;
 				funcm->LocalCount = funcf->LocalCount;
-				funcm->Address = funcf->Address;
+				funcm->Address = LittleLong(funcf->Address);
 			}
 		}
 
@@ -2058,7 +2066,7 @@ FBehavior::FBehavior (int lumpnum, FileReader * fr, int len)
 			const char *const parse = (char *)&chunk[2];
 			DWORD i;
 
-			for (i = 0; i < chunk[1]; )
+			for (i = 0; i < LittleLong(chunk[1]); )
 			{
 				if (parse[i])
 				{
@@ -2351,7 +2359,7 @@ void FBehavior::LoadScriptsDirectory ()
 	scripts.b = FindChunk (MAKE_ID('S','F','L','G'));
 	if (scripts.dw != NULL)
 	{
-		max = scripts.dw[1] / 4;
+		max = LittleLong(scripts.dw[1]) / 4;
 		scripts.dw += 2;
 		for (i = max; i > 0; --i, scripts.w += 2)
 		{
@@ -2367,7 +2375,7 @@ void FBehavior::LoadScriptsDirectory ()
 	scripts.b = FindChunk (MAKE_ID('S','V','C','T'));
 	if (scripts.dw != NULL)
 	{
-		max = scripts.dw[1] / 4;
+		max = LittleLong(scripts.dw[1]) / 4;
 		scripts.dw += 2;
 		for (i = max; i > 0; --i, scripts.w += 2)
 		{
@@ -2385,7 +2393,7 @@ void FBehavior::LoadScriptsDirectory ()
 		int size = LittleLong(scripts.dw[1]);
 		if (size >= 6)
 		{
-			int script_num = LittleShort(scripts.w[4]);
+			int script_num = LittleShort(scripts.sw[4]);
 			ScriptPtr *ptr = const_cast<ScriptPtr *>(FindScript(script_num));
 			if (ptr != NULL)
 			{
@@ -2681,7 +2689,7 @@ BYTE *FBehavior::FindChunk (DWORD id) const
 		{
 			return chunk;
 		}
-		chunk += ((DWORD *)chunk)[1] + 8;
+		chunk += LittleLong(((DWORD *)chunk)[1]) + 8;
 	}
 	return NULL;
 }
@@ -2689,14 +2697,14 @@ BYTE *FBehavior::FindChunk (DWORD id) const
 BYTE *FBehavior::NextChunk (BYTE *chunk) const
 {
 	DWORD id = *(DWORD *)chunk;
-	chunk += ((DWORD *)chunk)[1] + 8;
+	chunk += LittleLong(((DWORD *)chunk)[1]) + 8;
 	while (chunk != NULL && chunk < Data + DataSize)
 	{
 		if (((DWORD *)chunk)[0] == id)
 		{
 			return chunk;
 		}
-		chunk += ((DWORD *)chunk)[1] + 8;
+		chunk += LittleLong(((DWORD *)chunk)[1]) + 8;
 	}
 	return NULL;
 }
@@ -3673,6 +3681,7 @@ enum
 	APROP_AttackZOffset	= 40,
 	APROP_StencilColor	= 41,
 	APROP_Friction		= 42,
+	APROP_DamageMultiplier=43,
 };
 
 // These are needed for ACS's APROP_RenderStyle
@@ -3862,6 +3871,10 @@ void DLevelScript::DoSetActorProperty (AActor *actor, int property, int value)
 		actor->DamageFactor = value;
 		break;
 
+	case APROP_DamageMultiplier:
+		actor->DamageMultiply = value;
+		break;
+
 	case APROP_MasterTID:
 		AActor *other;
 		other = SingleActorFromTID (value, NULL);
@@ -3933,6 +3946,7 @@ int DLevelScript::GetActorProperty (int tid, int property, const SDWORD *stack, 
 	case APROP_Speed:		return actor->Speed;
 	case APROP_Damage:		return actor->Damage;	// Should this call GetMissileDamage() instead?
 	case APROP_DamageFactor:return actor->DamageFactor;
+	case APROP_DamageMultiplier: return actor->DamageMultiply;
 	case APROP_Alpha:		return actor->alpha;
 	case APROP_RenderStyle:	for (int style = STYLE_None; style < STYLE_Count; ++style)
 							{ // Check for a legacy render style that matches.
@@ -4424,6 +4438,11 @@ enum EACSFunctions
 	ACSF_PickActor,
 	ACSF_IsPointerEqual,
 	ACSF_CanRaiseActor,
+	ACSF_SetActorTeleFog,		// 86
+	ACSF_SwapActorTeleFog,
+	ACSF_SetActorRoll,
+	ACSF_ChangeActorRoll,
+	ACSF_GetActorRoll,
 
 	/* Zandronum's - these must be skipped when we reach 99!
 	-100:ResetMap(0),
@@ -4733,6 +4752,103 @@ static void SetActorPitch(AActor *activator, int tid, int angle, bool interpolat
 			actor->SetPitch(angle << 16, interpolate);
 		}
 	}
+}
+
+static void SetActorRoll(AActor *activator, int tid, int angle, bool interpolate)
+{
+	if (tid == 0)
+	{
+		if (activator != NULL)
+		{
+			activator->SetRoll(angle << 16, interpolate);
+		}
+	}
+	else
+	{
+		FActorIterator iterator(tid);
+		AActor *actor;
+
+		while ((actor = iterator.Next()))
+		{
+			actor->SetRoll(angle << 16, interpolate);
+		}
+	}
+}
+
+static void SetActorTeleFog(AActor *activator, int tid, FName telefogsrc, FName telefogdest)
+{
+	//Simply put, if it doesn't exist, it won't change. One can use "" in this scenario.
+	const PClass *check;
+	if (tid == 0)
+	{
+		if (activator != NULL)
+		{
+			check = PClass::FindClass(telefogsrc);
+			if (check == NULL || !stricmp(telefogsrc, "none") || !stricmp(telefogsrc, "null"))
+				activator->TeleFogSourceType = NULL;
+			else
+				activator->TeleFogSourceType = check;
+
+			check = PClass::FindClass(telefogdest);
+			if (check == NULL || !stricmp(telefogdest, "none") || !stricmp(telefogdest, "null"))
+				activator->TeleFogDestType = NULL;
+			else
+				activator->TeleFogDestType = check;
+		}
+	}
+	else
+	{
+		FActorIterator iterator(tid);
+		AActor *actor;
+
+		while ((actor = iterator.Next()))
+		{
+			check = PClass::FindClass(telefogsrc);
+			if (check == NULL || !stricmp(telefogsrc, "none") || !stricmp(telefogsrc, "null"))
+				actor->TeleFogSourceType = NULL;
+			else
+				actor->TeleFogSourceType = check;
+
+			check = PClass::FindClass(telefogdest);
+			if (check == NULL || !stricmp(telefogdest, "none") || !stricmp(telefogdest, "null"))
+				actor->TeleFogDestType = NULL;
+			else
+				actor->TeleFogDestType = check;
+		}
+	}
+}
+
+static int SwapActorTeleFog(AActor *activator, int tid)
+{
+	int count = 0;
+	if (tid == 0)
+	{
+		if ((activator == NULL) || (activator->TeleFogSourceType = activator->TeleFogDestType)) 
+			return 0; //Does nothing if they're the same.
+		else 
+		{
+			const PClass *temp = activator->TeleFogSourceType;
+			activator->TeleFogSourceType = activator->TeleFogDestType;
+			activator->TeleFogDestType = temp;
+			return 1;
+		}
+	}
+	else
+	{
+		FActorIterator iterator(tid);
+		AActor *actor;
+		
+		while ((actor = iterator.Next()))
+		{
+			if (actor->TeleFogSourceType == actor->TeleFogDestType) 
+				continue; //They're the same. Save the effort.
+			const PClass *temp = actor->TeleFogSourceType;
+			actor->TeleFogSourceType = actor->TeleFogDestType;
+			actor->TeleFogDestType = temp;
+			count++;
+		}
+	}
+	return count;
 }
 
 
@@ -5648,7 +5764,18 @@ doplaysound:			if (funcIndex == ACSF_PlayActorSound)
 				SetActorPitch(activator, args[0], args[1], argCount > 2 ? !!args[2] : false);
 			}
 			break;
-
+		case ACSF_SetActorTeleFog:
+			if (argCount >= 3)
+			{
+				SetActorTeleFog(activator, args[0], FBehavior::StaticLookupString(args[1]), FBehavior::StaticLookupString(args[2]));
+			}
+			break;
+		case ACSF_SwapActorTeleFog:
+			if (argCount >= 1)
+			{
+				return SwapActorTeleFog(activator, args[0]);
+			}
+			break;
 		case ACSF_PickActor:
 			if (argCount >= 5)
 			{
@@ -5728,6 +5855,26 @@ doplaysound:			if (funcIndex == ACSF_PlayActorSound)
 				return !canraiseall;
 			}
 			break;
+
+		// [Nash] Actor roll functions. Let's roll!
+		case ACSF_SetActorRoll:
+			actor = SingleActorFromTID(args[0], activator);
+			if (actor != NULL)
+			{
+				actor->SetRoll(args[1] << 16, false);
+			}
+			return 0;
+
+		case ACSF_ChangeActorRoll:
+			if (argCount >= 2)
+			{
+				SetActorRoll(activator, args[0], args[1], argCount > 2 ? !!args[2] : false);
+			}
+			break;
+
+		case ACSF_GetActorRoll:
+			actor = SingleActorFromTID(args[0], activator);
+			return actor != NULL? actor->roll >> 16 : 0;
 
 		default:
 			break;
@@ -7393,22 +7540,9 @@ scriptwait:
 			break;
 
 		case PCD_PRINTBINARY:
-#if (defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && (__GNUC_MINOR__ >= 6)))) || defined(__clang__)
-#define HAS_DIAGNOSTIC_PRAGMA
-#endif
-#ifdef HAS_DIAGNOSTIC_PRAGMA
-#pragma GCC diagnostic push
-#ifdef __clang__
-#pragma GCC diagnostic ignored "-Wformat-invalid-specifier"
-#else
-#pragma GCC diagnostic ignored "-Wformat="
-#endif
-#pragma GCC diagnostic ignored "-Wformat-extra-args"
-#endif
+			IGNORE_FORMAT_PRE
 			work.AppendFormat ("%B", STACK(1));
-#ifdef HAS_DIAGNOSTIC_PRAGMA
-#pragma GCC diagnostic pop
-#endif
+			IGNORE_FORMAT_POST
 			--sp;
 			break;
 
@@ -7711,13 +7845,6 @@ scriptwait:
 						AddToConsole (-1, consolecolor);
 						AddToConsole (-1, work);
 						AddToConsole (-1, bar);
-						if (Logfile)
-						{
-							fputs (logbar, Logfile);
-							fputs (work, Logfile);
-							fputs (logbar, Logfile);
-							fflush (Logfile);
-						}
 					}
 				}
 			}

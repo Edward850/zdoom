@@ -94,71 +94,46 @@ FCajunMaster::~FCajunMaster()
 	ForgetBots();
 }
 
-//This function is called every tick (from g_game.c),
-//send bots into thinking (+more).
-void FCajunMaster::Main (int buf)
+//This function is called every tick (from g_game.c).
+void FCajunMaster::Main ()
 {
-	int i;
-
 	BotThinkCycles.Reset();
 
-	if (demoplayback)
+	if (demoplayback || gamestate != GS_LEVEL || consoleplayer != Net_Arbitrator)
 		return;
 
-	if (gamestate != GS_LEVEL)
-		return;
-
-	m_Thinking = true;
-
-	//Think for bots.
-	if (botnum)
+	//Add new bots?
+	if (wanted_botnum > botnum && !freeze)
 	{
-		BotThinkCycles.Clock();
-		for (i = 0; i < MAXPLAYERS; i++)
+		if (t_join == ((wanted_botnum - botnum) * SPAWN_DELAY))
 		{
-			if (playeringame[i] && players[i].mo && !freeze && players[i].Bot != NULL)
-				Think (players[i].mo, &netcmds[i][buf]);
+			if (!SpawnBot (getspawned[spawn_tries]))
+				wanted_botnum--;
+			spawn_tries++;
 		}
-		BotThinkCycles.Unclock();
+
+		t_join--;
 	}
 
-	if (consoleplayer == Net_Arbitrator)
+	//Check if player should go observer. Or un observe
+	if (bot_observer && !observer && !netgame)
 	{
-		//Add new bots?
-		if (wanted_botnum > botnum && !freeze)
-		{
-			if (t_join == ((wanted_botnum - botnum) * SPAWN_DELAY))
-			{
-				if (!SpawnBot (getspawned[spawn_tries]))
-					wanted_botnum--;
-				spawn_tries++;
-			}
-
-			t_join--;
-		}
-
-		//Check if player should go observer. Or un observe
-		if (bot_observer && !observer && !netgame)
-		{
-			Printf ("%s is now observer\n", players[consoleplayer].userinfo.GetName());
-			observer = true;
-			players[consoleplayer].mo->UnlinkFromWorld ();
-			players[consoleplayer].mo->flags = MF_DROPOFF|MF_NOBLOCKMAP|MF_NOCLIP|MF_NOTDMATCH|MF_NOGRAVITY|MF_FRIENDLY;
-			players[consoleplayer].mo->flags2 |= MF2_FLY;
-			players[consoleplayer].mo->LinkToWorld ();
-		}
-		else if (!bot_observer && observer && !netgame) //Go back
-		{
-			Printf ("%s returned to the fray\n", players[consoleplayer].userinfo.GetName());
-			observer = false;
-			players[consoleplayer].mo->UnlinkFromWorld ();
-			players[consoleplayer].mo->flags = MF_SOLID|MF_SHOOTABLE|MF_DROPOFF|MF_PICKUP|MF_NOTDMATCH|MF_FRIENDLY;
-			players[consoleplayer].mo->flags2 &= ~MF2_FLY;
-			players[consoleplayer].mo->LinkToWorld ();
-		}
+		Printf ("%s is now observer\n", players[consoleplayer].userinfo.GetName());
+		observer = true;
+		players[consoleplayer].mo->UnlinkFromWorld ();
+		players[consoleplayer].mo->flags = MF_DROPOFF|MF_NOBLOCKMAP|MF_NOCLIP|MF_NOTDMATCH|MF_NOGRAVITY|MF_FRIENDLY;
+		players[consoleplayer].mo->flags2 |= MF2_FLY;
+		players[consoleplayer].mo->LinkToWorld ();
 	}
-
-	m_Thinking = false;
+	else if (!bot_observer && observer && !netgame) //Go back
+	{
+		Printf ("%s returned to the fray\n", players[consoleplayer].userinfo.GetName());
+		observer = false;
+		players[consoleplayer].mo->UnlinkFromWorld ();
+		players[consoleplayer].mo->flags = MF_SOLID|MF_SHOOTABLE|MF_DROPOFF|MF_PICKUP|MF_NOTDMATCH|MF_FRIENDLY;
+		players[consoleplayer].mo->flags2 &= ~MF2_FLY;
+		players[consoleplayer].mo->LinkToWorld ();
+	}
 }
 
 void FCajunMaster::Init ()
@@ -199,18 +174,16 @@ void FCajunMaster::End ()
 
 	//Arrange wanted botnum and their names, so they can be spawned next level.
 	getspawned.Clear();
-	for (i = 0; i < MAXPLAYERS; i++)
+	if (deathmatch)
 	{
-		if (playeringame[i] && players[i].Bot != NULL)
+		for (i = 0; i < MAXPLAYERS; i++)
 		{
-			if (deathmatch)
+			if (players[i].Bot != NULL)
 			{
 				getspawned.Push(players[i].userinfo.GetName());
 			}
 		}
-	}
-	if (deathmatch)
-	{
+
 		wanted_botnum = botnum;
 	}
 }
@@ -246,19 +219,16 @@ bool FCajunMaster::SpawnBot (const char *name, int color)
 		"\\color\\cf df 90"		//10 = Bleached Bone
 	};
 
-	botinfo_t *thebot;
-	int botshift;
+	botinfo_t *thebot = botinfo;
+	int botshift = 0;
 
 	if (name)
 	{
-		thebot = botinfo;
-
 		// Check if exist or already in the game.
-		botshift = 0;
 		while (thebot && stricmp (name, thebot->name))
 		{
-			thebot = thebot->next;
 			botshift++;
+			thebot = thebot->next;
 		}
 
 		if (thebot == NULL)
@@ -276,27 +246,36 @@ bool FCajunMaster::SpawnBot (const char *name, int color)
 			return false;
 		}
 	}
-	else if (botnum < loaded_bots)
-	{
-		bool vacant = false;  //Spawn a random bot from bots.cfg if no name given.
-		while (!vacant)
-		{
-			int rnum = (pr_botspawn() % loaded_bots);
-			thebot = botinfo;
-			botshift = 0;
-			while (rnum)
-			{
-				--rnum, thebot = thebot->next;
-				botshift++;
-			}
-			if (thebot->inuse == BOTINUSE_No)
-				vacant = true;
-		}
-	}
 	else
 	{
-		Printf ("Couldn't spawn bot; no bot left in %s\n", BOTFILENAME);
-		return false;
+		//Spawn a random bot from bots.cfg if no name given.
+		TArray<botinfo_t *> BotInfoAvailable;
+
+		while (thebot)
+		{
+			if (thebot->inuse == BOTINUSE_No)
+				BotInfoAvailable.Push (thebot);
+
+			thebot = thebot->next;
+		}
+
+		if (BotInfoAvailable.Size () == 0)
+		{
+			Printf ("Couldn't spawn bot; no bot left in %s\n", BOTFILENAME);
+			return false;
+		}
+
+		thebot = BotInfoAvailable[pr_botspawn() % BotInfoAvailable.Size ()];
+
+		botinfo_t *thebot2 = botinfo;
+		while (thebot2)
+		{
+			if (thebot == thebot2)
+				break;
+
+			botshift++;
+			thebot2 = thebot2->next;
+		}
 	}
 
 	thebot->inuse = BOTINUSE_Waiting;
@@ -400,7 +379,7 @@ bool FCajunMaster::DoAddBot (BYTE *info, botskill_t skill)
 
 	multiplayer = true; //Prevents cheating and so on; emulates real netgame (almost).
 	players[bnum].Bot = new DBot;
-	GC::WriteBarrier (players[bnum].Bot);
+	players[bnum].Bot->player = &players[bnum];
 	players[bnum].Bot->skill = skill;
 	playeringame[bnum] = true;
 	players[bnum].mo = NULL;
@@ -426,7 +405,7 @@ void FCajunMaster::RemoveAllBots (bool fromlist)
 
 	for (i = 0; i < MAXPLAYERS; ++i)
 	{
-		if (playeringame[i] && players[i].Bot != NULL)
+		if (players[i].Bot != NULL)
 		{
 			// If a player is looking through this bot's eyes, make him
 			// look through his own eyes instead.
@@ -454,18 +433,6 @@ void FCajunMaster::RemoveAllBots (bool fromlist)
 		wanted_botnum = 0;
 	}
 	botnum = 0;
-}
-
-void FCajunMaster::DestroyAllBots ()
-{
-	for (int i = 0; i < MAXPLAYERS; ++i)
-	{
-		if (players[i].Bot != NULL)
-		{
-			players[i].Bot->Destroy ();
-			players[i].Bot = NULL;
-		}
-	}
 }
 
 
@@ -520,7 +487,6 @@ void FCajunMaster::ForgetBots ()
 	}
 
 	botinfo = NULL;
-	loaded_bots = 0;
 }
 
 bool FCajunMaster::LoadBots ()
@@ -528,6 +494,7 @@ bool FCajunMaster::LoadBots ()
 	FScanner sc;
 	FString tmp;
 	bool gotteam = false;
+	int loaded_bots = 0;
 
 	bglobal.ForgetBots ();
 	tmp = M_GetCajunPath(BOTFILENAME);
@@ -644,9 +611,9 @@ bool FCajunMaster::LoadBots ()
 		newinfo->next = bglobal.botinfo;
 		newinfo->lastteam = TEAM_NONE;
 		bglobal.botinfo = newinfo;
-		bglobal.loaded_bots++;
+		loaded_bots++;
 	}
-	Printf ("%d bots read from %s\n", bglobal.loaded_bots, BOTFILENAME);
+	Printf ("%d bots read from %s\n", loaded_bots, BOTFILENAME);
 	return true;
 }
 

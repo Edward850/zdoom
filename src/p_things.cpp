@@ -92,7 +92,7 @@ bool P_Thing_Spawn (int tid, AActor *source, int type, angle_t angle, bool fog, 
 				mobj->angle = (angle != ANGLE_MAX ? angle : spot->angle);
 				if (fog)
 				{
-					Spawn<ATeleportFog> (spot->x, spot->y, spot->z + TELEFOGHEIGHT, ALLOW_REPLACE);
+					P_SpawnTeleportFog(mobj, spot->x, spot->y, spot->z + TELEFOGHEIGHT, false);
 				}
 				if (mobj->flags & MF_SPECIAL)
 					mobj->flags |= MF_DROPPED;	// Don't respawn
@@ -130,8 +130,8 @@ bool P_MoveThing(AActor *source, fixed_t x, fixed_t y, fixed_t z, bool fog)
 	{
 		if (fog)
 		{
-			Spawn<ATeleportFog> (x, y, z + TELEFOGHEIGHT, ALLOW_REPLACE);
-			Spawn<ATeleportFog> (oldx, oldy, oldz + TELEFOGHEIGHT, ALLOW_REPLACE);
+			P_SpawnTeleportFog(source, x, y, z);
+			P_SpawnTeleportFog(source, oldx, oldy, oldz, false);
 		}
 		source->PrevX = x;
 		source->PrevY = y;
@@ -412,7 +412,7 @@ void P_RemoveThing(AActor * actor)
 
 }
 
-bool P_Thing_Raise(AActor *thing)
+bool P_Thing_Raise(AActor *thing, AActor *raiser)
 {
 	FState * RaiseState = thing->GetRaiseState();
 	if (RaiseState == NULL)
@@ -444,6 +444,12 @@ bool P_Thing_Raise(AActor *thing)
 	S_Sound (thing, CHAN_BODY, "vile/raise", 1, ATTN_IDLE);
 
 	thing->Revive();
+
+	if (raiser != NULL)
+	{
+		// Let's copy the friendliness of the one who raised it.
+		thing->CopyFriendliness(raiser, false);
+	}
 
 	thing->SetState (RaiseState);
 	return true;
