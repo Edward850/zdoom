@@ -3380,6 +3380,7 @@ void P_FreeLevelData ()
 	FPolyObj::ClearAllSubsectorLinks(); // can't be done as part of the polyobj deletion process.
 	SN_StopAllSequences ();
 	DThinker::DestroyAllThinkers ();
+	FCanvasTextureInfo::EmptyList();
 	level.total_monsters = level.total_items = level.total_secrets =
 		level.killed_monsters = level.found_items = level.found_secrets =
 		wminfo.maxfrags = 0;
@@ -3565,7 +3566,6 @@ void P_SetupLevel (const char *lumpname, int position)
 	MapThingsUserDataIndex.Clear();
 	MapThingsUserData.Clear();
 	linemap.Clear();
-	FCanvasTextureInfo::EmptyList ();
 	R_FreePastViewers ();
 	P_ClearUDMFKeys();
 
