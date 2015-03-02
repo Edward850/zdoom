@@ -2464,6 +2464,9 @@ void D_DoomMain (void)
 		DThinker::RunThinkers ();
 		gamestate = GS_STARTUP;
 
+		delete StartScreen;
+		StartScreen = NULL;
+
 		if (!restart)
 		{
 			// start the apropriate game based on parms
@@ -2475,8 +2478,6 @@ void D_DoomMain (void)
 				autostart = true;
 			}
 
-			delete StartScreen;
-			StartScreen = NULL;
 			S_Sound (CHAN_BODY, "misc/startupdone", 1, ATTN_NONE);
 
 			if (Args->CheckParm("-norun"))
