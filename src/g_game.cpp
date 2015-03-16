@@ -1133,6 +1133,11 @@ void G_Ticker ()
 	//Added by MC: For some of that bot stuff. The main bot function.
 	bglobal.Main ();
 
+	if (demorecording || demoplayback)
+	{
+		demoposition++;
+	}
+
 	for (i = 0; i < MAXPLAYERS; i++)
 	{
 		if (playeringame[i])
@@ -1146,16 +1151,13 @@ void G_Ticker ()
 			}
 			if (demorecording)
 			{
-				demoposition++;
 				G_WriteDemoTiccmd (newcmd, i, buf);
 			}
+
 			players[i].oldbuttons = cmd->ucmd.buttons;
-			// If the user alt-tabbed away, paused gets set to -1. In this case,
-			// we do not want to read more demo commands until paused is no
-			// longer negative.
+
 			if (demoplayback)
 			{
-				demoposition++;
 				G_ReadDemoTiccmd (cmd, i);
 			}
 			else
