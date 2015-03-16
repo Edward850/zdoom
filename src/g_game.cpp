@@ -179,6 +179,7 @@ size_t			maxdemosize;
 BYTE*			zdemformend;			// end of FORM ZDEM chunk
 BYTE*			zdembodyend;			// end of ZDEM BODY chunk
 bool 			singledemo; 			// quit after playing a demo from cmdline 
+int				demoposition;			// The current tic postion of the demo
  
 bool 			precache = true;		// if true, load all graphics at start 
  
@@ -1145,6 +1146,7 @@ void G_Ticker ()
 			}
 			if (demorecording)
 			{
+				demoposition++;
 				G_WriteDemoTiccmd (newcmd, i, buf);
 			}
 			players[i].oldbuttons = cmd->ucmd.buttons;
@@ -1153,6 +1155,7 @@ void G_Ticker ()
 			// longer negative.
 			if (demoplayback)
 			{
+				demoposition++;
 				G_ReadDemoTiccmd (cmd, i);
 			}
 			else
@@ -2321,11 +2324,11 @@ extern BYTE *lenspot;
 void G_WriteDemoTiccmd (ticcmd_t *cmd, int player, int buf)
 {
 	BYTE *specdata;
-	int speclen;
+	int speclen = 0;
 
 	if (stoprecording)
 	{ // use "stop" console command to end demo recording
-		G_CheckDemoStatus ();
+		G_CheckDemoStatus();
 		if (!netgame)
 		{
 			gameaction = ga_fullconsole;
@@ -2333,19 +2336,15 @@ void G_WriteDemoTiccmd (ticcmd_t *cmd, int player, int buf)
 		return;
 	}
 
-	// [RH] Write any special "ticcmds" for this player to the demo
-	if ((specdata = NetSpecs[player][buf].GetData (&speclen)) && gametic % ticdup == 0)
+	// [ED850] Because specials have a dynamic size, we need to check the final length of everything first.
+	// Otherwise we risk writing into unallocated space.
+	if (gametic % ticdup == 0)
 	{
-		memcpy (demo_p, specdata, speclen);
-		demo_p += speclen;
-		NetSpecs[player][buf].SetData (NULL, 0);
+		specdata = NetSpecs[player][buf].GetData(&speclen);
 	}
-
-	// [RH] Now write out a "normal" ticcmd.
-	WriteUserCmdMessage (&cmd->ucmd, &players[player].cmd.ucmd, &demo_p);
-
-	// [RH] Bigger safety margin
-	if (demo_p > demobuffer + maxdemosize - 64)
+	// We need to pack some extra bytes for the usercmd flags.
+	// Probably not 128, but we'll cut this into the safety margin size.
+	while (demo_p + (speclen + sizeof(ticcmd_t) + 128) > demobuffer + maxdemosize)
 	{
 		ptrdiff_t pos = demo_p - demobuffer;
 		ptrdiff_t spot = lenspot - demobuffer;
@@ -2353,12 +2352,22 @@ void G_WriteDemoTiccmd (ticcmd_t *cmd, int player, int buf)
 		ptrdiff_t body = demobodyspot - demobuffer;
 		// [RH] Allocate more space for the demo
 		maxdemosize += 0x20000;
-		demobuffer = (BYTE *)M_Realloc (demobuffer, maxdemosize);
+		demobuffer = (BYTE *)M_Realloc(demobuffer, maxdemosize);
 		demo_p = demobuffer + pos;
 		lenspot = demobuffer + spot;
 		democompspot = demobuffer + comp;
 		demobodyspot = demobuffer + body;
 	}
+
+	// [RH] Write any special "ticcmds" for this player to the demo
+	if (speclen)
+	{
+		memcpy (demo_p, specdata, speclen);
+		demo_p += speclen;
+	}
+
+	// [RH] Now write out a "normal" ticcmd.
+	WriteUserCmdMessage (&cmd->ucmd, &players[player].cmd.ucmd, &demo_p);
 }
 
 
@@ -2375,6 +2384,7 @@ void G_RecordDemo (const char* name)
 	maxdemosize = 0x20000;
 	demobuffer = (BYTE *)M_Malloc (maxdemosize);
 	demorecording = true; 
+	demoposition = 0;
 }
 
 
@@ -2713,6 +2723,8 @@ void G_DoPlayDemo (void)
 
 		usergame = false;
 		demoplayback = true;
+
+		demoposition = 0;
 	}
 }
 
@@ -2844,4 +2856,21 @@ bool G_CheckDemoStatus (void)
 	}
 
 	return false; 
+}
+
+ADD_STAT(demo)
+{
+	FString out;
+	if (demorecording)
+	{
+		out.Format("Recording: %s - pos %d - size %.2fKB / %.2fKB", 
+			demoname, demoposition, (float)(demo_p - demobuffer) / 1024, (float)maxdemosize / 1024);
+	}
+	else if (demoplayback)
+	{
+		out.Format("Playback: pos %d - version %d - remaining bytes %d", 
+			demoposition, demover, (zdembodyend - demo_p));
+	}
+	else out.Format("No demo status avalible");
+	return out;
 }
