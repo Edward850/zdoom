@@ -52,6 +52,7 @@ void G_SaveGame (const char *filename, const char *description);
 
 // Only called by startup code.
 void G_RecordDemo (const char* name);
+void G_AutoRecordDemo ();
 
 void G_BeginRecording (const char *startmap);
 

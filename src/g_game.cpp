@@ -164,6 +164,10 @@ int 			consoleplayer;			// player taking events
 int 			gametic;
 
 CVAR(Bool, demo_compress, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG);
+CVAR(Bool, d_autorecord, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG);
+
+CVAR(String, demo_dir, "", CVAR_ARCHIVE | CVAR_GLOBALCONFIG);
+
 FString			newdemoname;
 FString			newdemomap;
 FString			demoname;
@@ -2389,6 +2393,74 @@ void G_RecordDemo (const char* name)
 	demoposition = 0;
 }
 
+static bool FindFreeDemoName(FString &fullname, const char *extension)
+{
+	FString lbmname;
+	int i;
+
+	for (i = 0; i <= 9999; i++)
+	{
+		const char *gamename = gameinfo.ConfigName;
+
+		time_t now;
+		tm *tm;
+
+		time(&now);
+		tm = localtime(&now);
+
+		if (tm == NULL)
+		{
+			lbmname.Format("%sRecording_%s_%04d.%s", fullname.GetChars(), gamename, i, extension);
+		}
+		else if (i == 0)
+		{
+			lbmname.Format("%sRecording_%s_%04d%02d%02d_%02d%02d%02d.%s", fullname.GetChars(), gamename,
+				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+				tm->tm_hour, tm->tm_min, tm->tm_sec,
+				extension);
+		}
+		else
+		{
+			lbmname.Format("%sRecording_%s_%04d%02d%02d_%02d%02d%02d_%02d.%s", fullname.GetChars(), gamename,
+				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+				tm->tm_hour, tm->tm_min, tm->tm_sec,
+				i, extension);
+		}
+
+		if (!FileExists(lbmname.GetChars()))
+		{
+			fullname = lbmname;
+			return true;		// file doesn't exist
+		}
+	}
+	return false;
+}
+
+void G_AutoRecordDemo()
+{
+	FString name;
+	FString leader;
+	const char *slash = "";
+
+	leader = demo_dir;
+	if (leader.IsEmpty())
+	{
+		leader = progdir + "demos/";
+	}
+
+	size_t len = leader.Len();
+	if (leader[0] != '\0' && leader[len - 1] != '\\' && leader[len - 1] != '/')
+	{
+		slash = "/";
+	}
+	name << leader << slash;
+	name = NicePath(name);
+	CreatePath(name);
+	if (FindFreeDemoName(name, "lmp"))
+	{
+		G_RecordDemo(name.GetChars());
+	}
+}
 
 // [RH] Demos are now saved as IFF FORMs. I've also removed support
 //		for earlier ZDEMs since I didn't want to bother supporting
@@ -2865,8 +2937,20 @@ ADD_STAT(demo)
 	FString out;
 	if (demorecording)
 	{
+		const char *fileonly = demoname.GetChars();
+		const char *slash = strrchr(fileonly, '\\');
+		if (slash != NULL)
+		{
+			fileonly = slash + 1;
+		}
+		slash = strrchr(fileonly, '/');
+		if (slash != NULL)
+		{
+			fileonly = slash + 1;
+		}
+
 		out.Format("Recording: %s - pos %d - size %.2fKB / %.2fKB", 
-			demoname, demoposition, (float)(demo_p - demobuffer) / 1024, (float)maxdemosize / 1024);
+			fileonly, demoposition, (float)(demo_p - demobuffer) / 1024, (float)maxdemosize / 1024);
 	}
 	else if (demoplayback)
 	{
