@@ -96,6 +96,7 @@ EXTERN_CVAR (Float, sv_gravity)
 EXTERN_CVAR (Float, sv_aircontrol)
 EXTERN_CVAR (Int, disableautosave)
 EXTERN_CVAR (String, playerclass)
+EXTERN_CVAR (Bool, d_autorecord)
 
 #define SNAP_ID			MAKE_ID('s','n','A','p')
 #define DSNP_ID			MAKE_ID('d','s','N','p')
@@ -323,6 +324,12 @@ void G_NewInit ()
 
 void G_DoNewGame (void)
 {
+	if (!demorecording && !demoplayback && d_autorecord)
+	{
+		G_AutoRecordDemo();
+		G_BeginRecording(d_mapname);
+	}
+
 	G_NewInit ();
 	playeringame[consoleplayer] = 1;
 	if (d_skill != -1)

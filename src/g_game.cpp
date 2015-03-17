@@ -20,7 +20,7 @@
 //
 //-----------------------------------------------------------------------------
 
-
+#include <vld.h> 
 
 #include <string.h>
 #include <stdlib.h>
@@ -86,6 +86,7 @@
 
 #include "g_hub.h"
 
+#define DEMO_ID			MAKE_ID('d','e','M','o')
 
 static FRandom pr_dmspawn ("DMSpawn");
 static FRandom pr_pspawn ("PlayerSpawn");
@@ -165,7 +166,7 @@ int 			gametic;
 
 CVAR(Bool, demo_compress, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG);
 CVAR(Bool, d_autorecord, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG);
-
+CVAR(Bool, d_continuesaves, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG);
 CVAR(String, demo_dir, "", CVAR_ARCHIVE | CVAR_GLOBALCONFIG);
 
 FString			newdemoname;
@@ -184,6 +185,8 @@ BYTE*			zdemformend;			// end of FORM ZDEM chunk
 BYTE*			zdembodyend;			// end of ZDEM BODY chunk
 bool 			singledemo; 			// quit after playing a demo from cmdline 
 int				demoposition;			// The current tic postion of the demo
+void	G_WriteDemoChunk(FILE *file);
+void	G_ReadDemoChunk(PNGHandle *png);
  
 bool 			precache = true;		// if true, load all graphics at start 
  
@@ -1954,6 +1957,8 @@ void G_DoLoadGame ()
 
 	P_ReadACSVars(png);
 
+	G_ReadDemoChunk(png);
+
 	NextSkill = -1;
 	if (M_FindPNGChunk (png, MAKE_ID('s','n','X','t')) == 1)
 	{
@@ -2220,6 +2225,8 @@ void G_DoSaveGame (bool okForQuicksave, FString filename, const char *descriptio
 
 	P_WriteACSVars(stdfile);
 
+	G_WriteDemoChunk(stdfile);
+
 	if (NextSkill != -1)
 	{
 		BYTE next = NextSkill;
@@ -2329,7 +2336,7 @@ extern BYTE *lenspot;
 
 void G_WriteDemoTiccmd (ticcmd_t *cmd, int player, int buf)
 {
-	BYTE *specdata;
+	BYTE *specdata = NULL;
 	int speclen = 0;
 
 	if (stoprecording)
@@ -2366,10 +2373,11 @@ void G_WriteDemoTiccmd (ticcmd_t *cmd, int player, int buf)
 	}
 
 	// [RH] Write any special "ticcmds" for this player to the demo
-	if (speclen)
+	if (specdata)
 	{
 		memcpy (demo_p, specdata, speclen);
 		demo_p += speclen;
+		NetSpecs[player][buf].SetData(NULL, 0);
 	}
 
 	// [RH] Now write out a "normal" ticcmd.
@@ -2814,6 +2822,43 @@ void G_TimeDemo (const char* name)
 
 	defdemoname = name;
 	gameaction = (gameaction == ga_loadgame) ? ga_loadgameplaydemo : ga_playdemo;
+}
+
+void G_WriteDemoChunk(FILE *file)
+{
+	if (demorecording && d_continuesaves)
+	{
+		FPNGChunkArchive arc(file, DEMO_ID);
+		ptrdiff_t pos = demo_p - demobuffer;
+		ptrdiff_t spot = lenspot - demobuffer;
+		ptrdiff_t comp = democompspot - demobuffer;
+		ptrdiff_t body = demobodyspot - demobuffer;
+		arc << pos << spot << comp << body << demoposition;
+		arc.Write(demobuffer, pos);
+	}
+}
+
+void G_ReadDemoChunk(PNGHandle *png)
+{
+	int chunkLen = (DWORD)M_FindPNGChunk(png, DEMO_ID);
+
+	if (demorecording && d_continuesaves && chunkLen)
+	{
+		FPNGChunkArchive arc(png->File->GetFile(), DEMO_ID, chunkLen);
+
+		ptrdiff_t pos = 0, spot = 0, comp = 0, body = 0;
+
+		arc << pos << spot << comp << body << demoposition;
+
+		maxdemosize = pos + 0x20000;
+		demobuffer = (BYTE *)M_Realloc(demobuffer, maxdemosize);
+		demo_p = demobuffer + pos;
+		lenspot = demobuffer + spot;
+		democompspot = demobuffer + comp;
+		demobodyspot = demobuffer + body;
+
+		arc.Read(demobuffer, pos);
+	}
 }
 
 

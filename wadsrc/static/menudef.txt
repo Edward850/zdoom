@@ -895,6 +895,10 @@ OptionMenu "MiscOptions"
 	Slider "Number of autosaves",					"autosavecount", 1, 20, 1, 0
 	Option "Load *.deh/*.bex lumps",				"dehload", "dehopt"
 	StaticText " "
+	Option "Automatically record all games",		"d_autorecord", "OnOff"
+	Option "Store/Continue recordings in saves",	"d_continuesaves", "OnOff"
+	Option "Playback previous games on title",		"d_titleplayback", "OnOff"
+	StaticText " "
 	Option "Cache nodes",							"gl_cachenodes", "OnOff"
 	Slider "Time threshold for node caching",		"gl_cachetime", 0.0, 2.0, 0.1
 	SafeCommand "Clear node cache",					"clearnodecache"
