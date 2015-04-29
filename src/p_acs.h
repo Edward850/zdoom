@@ -309,7 +309,7 @@ public:
 	ScriptPtr *GetScriptPtr(int index) const { return index >= 0 && index < NumScripts ? &Scripts[index] : NULL; }
 	int GetLumpNum() const { return LumpNum; }
 	int GetDataSize() const { return DataSize; }
-	const char *GetModuleName() const { return ModuleName; }
+	FString GetModuleName() const { return ModuleName; }
 	ACSProfileInfo *GetFunctionProfileData(int index) { return index >= 0 && index < NumFunctions ? &FunctionProfileData[index] : NULL; }
 	ACSProfileInfo *GetFunctionProfileData(ScriptFunction *func) { return GetFunctionProfileData((int)(func - (ScriptFunction *)Functions)); }
 	const char *LookupString (DWORD index) const;
@@ -353,7 +353,7 @@ private:
 	SDWORD MapVarStore[NUM_MAPVARS];
 	TArray<FBehavior *> Imports;
 	DWORD LibraryID;
-	char ModuleName[9];
+	FString ModuleName;
 	TArray<int> JumpPoints;
 
 	static TArray<FBehavior *> StaticModules;

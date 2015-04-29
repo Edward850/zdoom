@@ -1543,20 +1543,17 @@ void FBehavior::StaticSerializeModuleStates (FArchive &arc)
 		}
 		else
 		{
-			char *modname = NULL;
+			FString modname;
 			arc << modname;
 			if (SaveVersion >= 4516) arc << ModSize;
 			if (stricmp (modname, module->ModuleName) != 0)
 			{
-				delete[] modname;
 				I_Error("Level was saved with a different set or order of ACS modules. (Have %s, save has %s)", module->ModuleName, modname);
 			}
 			else if (ModSize != module->GetDataSize())
 			{
-				delete[] modname;
 				I_Error("ACS module %s has changed from what was saved. (Have %d bytes, save has %d bytes)", module->ModuleName, module->GetDataSize(), ModSize);
 			}
-			delete[] modname;
 		}
 		module->SerializeVars (arc);
 	}
@@ -1685,7 +1682,7 @@ FBehavior::FBehavior (int lumpnum, FileReader * fr, int len)
 	Format = ACS_Unknown;
 	LumpNum = lumpnum;
 	memset (MapVarStore, 0, sizeof(MapVarStore));
-	ModuleName[0] = 0;
+	ModuleName = "";
 	FunctionProfileData = NULL;
 
 	// Now that everything is set up, record this module as being among the loaded modules.
@@ -1748,11 +1745,10 @@ FBehavior::FBehavior (int lumpnum, FileReader * fr, int len)
 	if (fr == NULL)
 	{
 		Wads.GetLumpName (ModuleName, lumpnum);
-		ModuleName[8] = 0;
 	}
 	else
 	{
-		strcpy(ModuleName, "BEHAVIOR");
+		ModuleName = "BEHAVIOR";
 	}
 
 	Data = object;
