@@ -1699,7 +1699,14 @@ FBehavior::FBehavior (int lumpnum, FileReader * fr, int len)
 
 	if (fr == NULL) len = Wads.LumpLength (lumpnum);
 
-
+	if (fr == NULL)
+	{
+		Wads.GetLumpName(ModuleName, lumpnum);
+	}
+	else
+	{
+		ModuleName = "BEHAVIOR";
+	}
 
 	// Any behaviors smaller than 32 bytes cannot possibly contain anything useful.
 	// (16 bytes for a completely empty behavior + 12 bytes for one script header
@@ -1707,6 +1714,7 @@ FBehavior::FBehavior (int lumpnum, FileReader * fr, int len)
 	// has 24 bytes if it is completely empty. An empty SPTR chunk adds 8 bytes.)
 	if (len < 32)
 	{
+		I_Error("ACS module %s failed to load: Lump is too short to have an ACS header", ModuleName);
 		return;
 	}
 
@@ -1723,6 +1731,7 @@ FBehavior::FBehavior (int lumpnum, FileReader * fr, int len)
 	if (object[0] != 'A' || object[1] != 'C' || object[2] != 'S')
 	{
 		delete[] object;
+		I_Error("ACS module %s failed to load: Lump is not an ACS module", ModuleName);
 		return;
 	}
 
@@ -1739,16 +1748,8 @@ FBehavior::FBehavior (int lumpnum, FileReader * fr, int len)
 		break;
 	default:
 		delete[] object;
+		I_Error("ACS module %s failed to load: ACS type is unknown", ModuleName);
 		return;
-	}
-
-	if (fr == NULL)
-	{
-		Wads.GetLumpName (ModuleName, lumpnum);
-	}
-	else
-	{
-		ModuleName = "BEHAVIOR";
 	}
 
 	Data = object;
@@ -2063,10 +2064,9 @@ FBehavior::FBehavior (int lumpnum, FileReader * fr, int len)
 								func->ImportNum = i+1;
 								if (realfunc->ArgCount != func->ArgCount)
 								{
-									Printf ("Function %s in %s has %d arguments. %s expects it to have %d.\n",
+									I_Error("ACS module %s failed to load: Function %s in %s has %d arguments. %s expects it to have %d.\n", ModuleName, 
 										(char *)(chunk + 2) + chunk[3+j], lib->ModuleName, realfunc->ArgCount,
 										ModuleName, func->ArgCount);
-									Format = ACS_Unknown;
 								}
 								// The next two properties do not affect code compatibility, so it is
 								// okay for them to be different in the imported module than they are
@@ -2115,8 +2115,7 @@ FBehavior::FBehavior (int lumpnum, FileReader * fr, int len)
 							MapVarStore[varNum] = NumArrays + j;
 							if (lib->ArrayStore[impNum].ArraySize != expectedSize)
 							{
-								Format = ACS_Unknown;
-								Printf ("The array %s in %s has %u elements, but %s expects it to only have %u.\n",
+								I_Error("ACS module %s failed to load: The array %s in %s has %u elements, but %s expects it to only have %u.\n", ModuleName, 
 									parse, lib->ModuleName, lib->ArrayStore[impNum].ArraySize,
 									ModuleName, expectedSize);
 							}
