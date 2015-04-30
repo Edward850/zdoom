@@ -3307,12 +3307,11 @@ void P_LoadBehavior (MapData * map)
 {
 	map->Seek(ML_BEHAVIOR);
 	FBehavior::StaticLoadModule (-1, map->file, map->Size(ML_BEHAVIOR));
-	// [ED850] No longer needed due to I_Error.
-	/*if (!FBehavior::StaticCheckAllGood ())
+	if (!FBehavior::StaticCheckAllGood ())
 	{
 		Printf ("ACS scripts unloaded.\n");
 		FBehavior::StaticUnloadModules ();
-	}*/
+	}
 }
 
 void P_GetPolySpots (MapData * map, TArray<FNodeBuilder::FPolyStart> &spots, TArray<FNodeBuilder::FPolyStart> &anchors)
