@@ -52,6 +52,7 @@
 #include "r_3dfloors.h"
 #include "v_palette.h"
 #include "r_data/colormaps.h"
+#include "d_main.h"
 
 #define WALLYREPEAT 8
 
@@ -429,6 +430,7 @@ void R_RenderMaskedSegRange (drawseg_t *ds, int x1, int x2)
 			for (dc_x = x1; dc_x <= x2; ++dc_x)
 			{
 				BlastMaskedColumn (R_DrawMaskedColumn, tex);
+				D_DrawNow(10);
 			}
 		}
 		else
@@ -444,6 +446,7 @@ void R_RenderMaskedSegRange (drawseg_t *ds, int x1, int x2)
 			while ((dc_x < stop) && (dc_x & 3))
 			{
 				BlastMaskedColumn (R_DrawMaskedColumn, tex);
+				D_DrawNow(10);
 				dc_x++;
 			}
 
@@ -455,12 +458,14 @@ void R_RenderMaskedSegRange (drawseg_t *ds, int x1, int x2)
 				BlastMaskedColumn (R_DrawMaskedColumnHoriz, tex); dc_x++;
 				BlastMaskedColumn (R_DrawMaskedColumnHoriz, tex);
 				rt_draw4cols (dc_x - 3);
+				D_DrawNow(10);
 				dc_x++;
 			}
 
 			while (dc_x <= x2)
 			{
 				BlastMaskedColumn (R_DrawMaskedColumn, tex);
+				D_DrawNow(10);
 				dc_x++;
 			}
 		}
@@ -1114,6 +1119,7 @@ void wallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal, fixed_t 
 		dc_texturefrac = texturemid + FixedMul (dc_iscale, (y1ve[0]<<FRACBITS)-centeryfrac+FRACUNIT);
 
 		dovline1();
+		D_DrawNow(10);
 	}
 
 	for(; x <= x2-3; x += 4)
@@ -1175,6 +1181,7 @@ void wallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal, fixed_t 
 			dc_count = d4-u4;
 			dc_dest = ylookup[u4]+x+dc_destorg;
 			dovline4();
+			D_DrawNow(10);
 		}
 
 		BYTE *i = x+ylookup[d4]+dc_destorg;
@@ -1207,6 +1214,7 @@ void wallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal, fixed_t 
 		dc_texturefrac = texturemid + FixedMul (dc_iscale, (y1ve[0]<<FRACBITS)-centeryfrac+FRACUNIT);
 
 		dovline1();
+		D_DrawNow(10);
 	}
 
 //unclock (WallScanCycles);
@@ -1458,6 +1466,7 @@ void maskwallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal, fixe
 		dc_texturefrac = texturemid + FixedMul (dc_iscale, (y1ve[0]<<FRACBITS)-centeryfrac+FRACUNIT);
 
 		domvline1();
+		D_DrawNow(10);
 	}
 
 	for(; x <= x2-3; x += 4, p+= 4)
@@ -1517,6 +1526,7 @@ void maskwallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal, fixe
 			dc_count = d4-u4;
 			dc_dest = ylookup[u4]+p;
 			domvline4();
+			D_DrawNow(10);
 		}
 
 		BYTE *i = p+ylookup[d4];
@@ -1547,6 +1557,7 @@ void maskwallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal, fixe
 		dc_texturefrac = texturemid + FixedMul (dc_iscale, (y1ve[0]<<FRACBITS)-centeryfrac+FRACUNIT);
 
 		domvline1();
+		D_DrawNow(10);
 	}
 
 //unclock(WallScanCycles);
@@ -1631,6 +1642,7 @@ void transmaskwallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal,
 		dc_texturefrac = texturemid + FixedMul (dc_iscale, (y1ve[0]<<FRACBITS)-centeryfrac+FRACUNIT);
 
 		tmvline1();
+		D_DrawNow(10);
 	}
 
 	for(; x <= x2-3; x += 4, p+= 4)
@@ -1672,6 +1684,7 @@ void transmaskwallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal,
 				{
 					preptmvline1(vince[z],palookupoffse[z],y2ve[z]-y1ve[z],vplce[z],bufplce[z],ylookup[y1ve[z]]+p+z);
 					tmvline1();
+					D_DrawNow(10);
 				}
 				bad >>= 1;
 			}
@@ -1692,6 +1705,7 @@ void transmaskwallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal,
 			dc_count = d4-u4;
 			dc_dest = ylookup[u4]+p;
 			tmvline4();
+			D_DrawNow(10);
 		}
 
 		BYTE *i = p+ylookup[d4];
@@ -1701,6 +1715,7 @@ void transmaskwallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal,
 			{
 				preptmvline1(vince[z],palookupoffse[0],y2ve[z]-d4,vplce[z],bufplce[z],i+z);
 				tmvline1();
+				D_DrawNow(10);
 			}
 		}
 	}
@@ -1723,6 +1738,7 @@ void transmaskwallscan (int x1, int x2, short *uwal, short *dwal, fixed_t *swal,
 		dc_texturefrac = texturemid + FixedMul (dc_iscale, (y1ve[0]<<FRACBITS)-centeryfrac+FRACUNIT);
 
 		tmvline1();
+		D_DrawNow(10);
 	}
 
 //unclock(WallScanCycles);
@@ -3226,6 +3242,7 @@ static void R_RenderDecal (side_t *wall, DBaseDecal *decal, drawseg_t *clipper, 
 					dc_colormap = usecolormap->Maps + (GETPALOOKUP (rw_light, wallshade) << COLORMAPSHIFT);
 				}
 				R_WallSpriteColumn (R_DrawMaskedColumn);
+				D_DrawNow(10);
 				dc_x++;
 			}
 
@@ -3241,6 +3258,7 @@ static void R_RenderDecal (side_t *wall, DBaseDecal *decal, drawseg_t *clipper, 
 					R_WallSpriteColumn (R_DrawMaskedColumnHoriz);
 					dc_x++;
 				}
+				D_DrawNow(10);
 				rt_draw4cols (dc_x - 4);
 			}
 
@@ -3251,6 +3269,7 @@ static void R_RenderDecal (side_t *wall, DBaseDecal *decal, drawseg_t *clipper, 
 					dc_colormap = usecolormap->Maps + (GETPALOOKUP (rw_light, wallshade) << COLORMAPSHIFT);
 				}
 				R_WallSpriteColumn (R_DrawMaskedColumn);
+				D_DrawNow(10);
 				dc_x++;
 			}
 		}

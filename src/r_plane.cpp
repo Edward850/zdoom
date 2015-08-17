@@ -58,6 +58,7 @@
 #include "r_3dfloors.h"
 #include "v_palette.h"
 #include "r_data/colormaps.h"
+#include "d_main.h"
 
 #ifdef _MSC_VER
 #pragma warning(disable:4244)
@@ -239,6 +240,7 @@ void R_MapPlane (int y, int x1)
 	ds_x2 = x2;
 
 	spanfunc ();
+	D_DrawNow(1);
 }
 
 //==========================================================================
@@ -440,6 +442,7 @@ void R_MapTiltedPlane (int y, int x1)
 		startv = endv;
 		width -= SPANSIZE;
 	}
+	D_DrawNow(1);
 	if (width > 0)
 	{
 		if (width == 1)
@@ -472,6 +475,7 @@ void R_MapTiltedPlane (int y, int x1)
 				v += stepv;
 			}
 		}
+		D_DrawNow(1);
 	}
 #endif
 }
@@ -1719,7 +1723,7 @@ void R_DrawTiltedPlane (visplane_t *pl, fixed_t alpha, bool additive, bool maske
 		}
 	}
 
-#if defined(X86_ASM)
+#if 0
 	if (ds_source != ds_curtiltedsource)
 		R_SetTiltedSpanSource_ASM (ds_source);
 	R_MapVisPlane (pl, R_DrawTiltedPlane_ASM);

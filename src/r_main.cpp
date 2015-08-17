@@ -57,6 +57,7 @@
 #include "v_font.h"
 #include "r_data/colormaps.h"
 #include "farchive.h"
+#include "d_main.h"
 
 // MACROS ------------------------------------------------------------------
 

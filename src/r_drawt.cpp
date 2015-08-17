@@ -46,6 +46,7 @@
 #include "r_main.h"
 #include "r_things.h"
 #include "v_video.h"
+#include "d_main.h"
 
 // I should have commented this stuff better.
 //

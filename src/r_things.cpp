@@ -62,6 +62,7 @@
 #include "r_data/colormaps.h"
 #include "r_data/voxels.h"
 #include "p_local.h"
+#include "d_main.h"
 
 // [RH] A c-buffer. Used for keeping track of offscreen voxel spans.
 
@@ -374,6 +375,7 @@ void R_DrawVisSprite (vissprite_t *vis)
 			{
 				pixels = tex->GetColumn (frac >> FRACBITS, &spans);
 				R_DrawMaskedColumn (pixels, spans);
+				D_DrawNow(10);
 				dc_x++;
 				frac += xiscale;
 			}
@@ -389,12 +391,14 @@ void R_DrawVisSprite (vissprite_t *vis)
 					frac += xiscale;
 				}
 				rt_draw4cols (dc_x - 4);
+				D_DrawNow(10);
 			}
 
 			while (dc_x < x2)
 			{
 				pixels = tex->GetColumn (frac >> FRACBITS, &spans);
 				R_DrawMaskedColumn (pixels, spans);
+				D_DrawNow(10);
 				dc_x++;
 				frac += xiscale;
 			}

@@ -185,6 +185,7 @@ CUSTOM_CVAR (Int, fraglimit, 0, CVAR_SERVERINFO)
 CVAR (Float, timelimit, 0.f, CVAR_SERVERINFO);
 CVAR (Int, wipetype, 1, CVAR_ARCHIVE);
 CVAR (Int, snd_drawoutput, 0, 0);
+CVAR(Bool, slowdraw, 0, 0);
 CUSTOM_CVAR (String, vid_cursor, "None", CVAR_ARCHIVE | CVAR_NOINITCALL)
 {
 	bool res = false;
@@ -631,6 +632,46 @@ CVAR (Flag, compat_soundcutoff,			compatflags2, COMPATF2_SOUNDCUTOFF);
 //
 //==========================================================================
 
+bool doslowdraw;
+void D_DrawNow(int delay)
+{
+	if (doslowdraw)
+	{
+		bool hw2d;
+		if ((hw2d = screen->Begin2D(viewactive)))
+		{
+			// Redraw everything every frame when using 2D accel
+			ST_SetNeedRefresh();
+			V_SetBorderNeedRefresh();
+		}
+		screen->Update();
+
+		_sleep(delay);
+
+		if (screen->Lock(false))
+		{
+			ST_SetNeedRefresh();
+			V_SetBorderNeedRefresh();
+		}
+	}
+}
+
+bool isslowdraw = false;
+void D_PauseForceDraw(bool pause)
+{
+	if (pause)
+	{
+		isslowdraw = doslowdraw;
+		doslowdraw = false;
+		return;
+	}
+	else if (isslowdraw)
+	{
+		isslowdraw = false;
+		doslowdraw = true;
+	}
+}
+
 void D_Display ()
 {
 	bool wipe;
@@ -643,6 +684,12 @@ void D_Display ()
 	
 	cycles.Reset();
 	cycles.Clock();
+
+	if (slowdraw)
+	{
+		doslowdraw = true;
+		slowdraw = false;
+	}
 
 	if (players[consoleplayer].camera == NULL)
 	{
@@ -881,6 +928,11 @@ void D_Display ()
 		M_Drawer ();			// menu is drawn even on top of everything
 		FStat::PrintStat ();
 		screen->Update ();		// page flip or blit buffer
+		if (doslowdraw)
+		{
+			_sleep(3000);
+			doslowdraw = false;
+		}
 	}
 	else
 	{

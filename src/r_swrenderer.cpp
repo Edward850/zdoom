@@ -42,6 +42,7 @@
 #include "r_3dfloors.h"
 #include "textures/textures.h"
 #include "r_data/voxels.h"
+#include "d_main.h"
 
 
 class FArchive;
@@ -110,7 +111,9 @@ void FSoftwareRenderer::RenderView(player_t *player)
 {
 	R_RenderActorView (player->mo);
 	// [RH] Let cameras draw onto textures that were visible this frame.
+	D_PauseForceDraw(true);
 	FCanvasTextureInfo::UpdateAll ();
+	D_PauseForceDraw(false);
 }
 
 //==========================================================================

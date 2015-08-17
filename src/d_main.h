@@ -44,7 +44,8 @@ struct CRestartException
 
 void D_DoomMain (void);
 
-
+void D_DrawNow(int);
+void D_PauseForceDraw(bool);
 void D_Display ();
 
 
