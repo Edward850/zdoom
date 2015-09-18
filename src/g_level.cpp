@@ -1003,6 +1003,16 @@ void G_DoLoadLevel (int position, bool autosave)
 	level.starttime = gametic;
 	G_UnSnapshotLevel (!savegamerestore);	// [RH] Restore the state of the level.
 	G_FinishTravel ();
+
+	// Report any issues with spawn starts
+	if (!deathmatch && playerstarts[0].type == 0)
+		Printf(TEXTCOLOR_RED "No player 1 start found in map.\n");
+	if (deathmatch && deathmatchstarts.Size() == 0)
+		Printf(TEXTCOLOR_RED "No deathmatch starts found in map.\n");
+	// If there aren't any starts at all, the player likely hasn't spawned, so we need to abort
+	if (AllPlayerStarts.Size() == 0)
+		I_Error("No starts exist to spawn players\n");
+
 	// For each player, if they are viewing through a player, make sure it is themselves.
 	for (int ii = 0; ii < MAXPLAYERS; ++ii)
 	{
