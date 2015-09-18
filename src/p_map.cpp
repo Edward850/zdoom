@@ -57,6 +57,7 @@ CVAR(Bool, cl_bloodsplats, true, CVAR_ARCHIVE)
 CVAR(Int, sv_smartaim, 0, CVAR_ARCHIVE | CVAR_SERVERINFO)
 CVAR(Bool, cl_doautoaim, false, CVAR_ARCHIVE)
 CVAR(Bool, sv_playerstomp, false, CVAR_SERVERINFO)
+CVAR(Bool, sv_friendlytelefrags, false, CVAR_SERVERINFO)
 
 static void CheckForPushSpecial(line_t *line, int side, AActor *mobj, bool windowcheck);
 static void SpawnShootDecal(AActor *t1, const FTraceResults &trace);
@@ -418,6 +419,10 @@ bool P_TeleportMove(AActor *thing, fixed_t x, fixed_t y, fixed_t z, bool telefra
 
 		// don't clip against self
 		if (th == thing)
+			continue;
+
+		// Skip friends
+		if (thing->IsTeammate(th) && !sv_friendlytelefrags)
 			continue;
 
 		fixed_t blockdist = th->radius + tmf.thing->radius;
