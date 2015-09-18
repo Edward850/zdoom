@@ -1518,6 +1518,9 @@ static FPlayerStart *SelectRandomDeathmatchSpot (int playernum, unsigned int sel
 {
 	unsigned int i, j;
 
+	if (selections == 0)
+		return NULL;
+
 	for (j = 0; j < 20; j++)
 	{
 		i = pr_dmspawn() % selections;
@@ -1537,17 +1540,14 @@ void G_DeathMatchSpawnPlayer (int playernum)
 	FPlayerStart *spot;
 
 	selections = deathmatchstarts.Size ();
-	// [RH] We can get by with just 1 deathmatch start
-	if (selections < 1)
-		I_Error ("No deathmatch starts");
 
 	// At level start, none of the players have mobjs attached to them,
 	// so we always use the random deathmatch spawn. During the game,
 	// though, we use whatever dmflags specifies.
 	if ((dmflags & DF_SPAWN_FARTHEST) && players[playernum].mo)
-		spot = SelectFarthestDeathmatchSpot (selections);
+		spot = SelectFarthestDeathmatchSpot(selections);
 	else
-		spot = SelectRandomDeathmatchSpot (playernum, selections);
+		spot = SelectRandomDeathmatchSpot(playernum, selections);
 
 	if (spot == NULL)
 	{ // No good spot, so the player will probably get stuck.
@@ -1559,12 +1559,8 @@ void G_DeathMatchSpawnPlayer (int playernum)
 		  // to use one.
 			spot = SelectRandomDeathmatchSpot(playernum, selections);
 			if (spot == NULL)
-			{ // We have a player 1 start, right?
-				spot = &playerstarts[0];
-				if (spot == NULL)
-				{ // Fine, whatever.
-					spot = &deathmatchstarts[0];
-				}
+			{ // Fine, whatever.
+				spot = &deathmatchstarts[0];
 			}
 		}
 	}

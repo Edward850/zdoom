@@ -4002,6 +4002,31 @@ void P_SetupLevel (const char *lumpname, int position)
 	delete[] sidetemp;
 	sidetemp = NULL;
 
+	// Report any issues with spawn starts
+	if (!deathmatch)
+	{
+		if (playerstarts[0].type == 0)
+			Printf(TEXTCOLOR_RED "No player 1 start found in map.\n");
+
+		if (multiplayer)
+		{
+			bool found = false;
+			for (int i = 1; i < MAXPLAYERS; i++)
+				if (playerstarts[i].type != 0)
+				{
+					found = true;
+					break;
+				}
+			if (!found)
+				Printf(TEXTCOLOR_RED "No coop starts found in map.\n");
+		}
+	}
+	if (deathmatch && deathmatchstarts.Size() == 0)
+		Printf(TEXTCOLOR_RED "No deathmatch starts found in map.\n");
+	// If there aren't any starts at all, the player likely hasn't spawned, so we need to abort
+	if (AllPlayerStarts.Size() == 0)
+		I_Error("No starts exist to spawn players\n");
+
 	// if deathmatch, randomly spawn the active players
 	if (deathmatch)
 	{
