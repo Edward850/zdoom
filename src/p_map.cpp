@@ -56,6 +56,7 @@
 CVAR(Bool, cl_bloodsplats, true, CVAR_ARCHIVE)
 CVAR(Int, sv_smartaim, 0, CVAR_ARCHIVE | CVAR_SERVERINFO)
 CVAR(Bool, cl_doautoaim, false, CVAR_ARCHIVE)
+CVAR(Bool, sv_playerstomp, false, CVAR_SERVERINFO)
 
 static void CheckForPushSpecial(line_t *line, int side, AActor *mobj, bool windowcheck);
 static void SpawnShootDecal(AActor *t1, const FTraceResults &trace);
@@ -500,6 +501,9 @@ void P_PlayerStartStomp(AActor *actor)
 
 	while ((th = it.Next()))
 	{
+		if (th->player && !sv_playerstomp)
+			continue;
+
 		if (!(th->flags & MF_SHOOTABLE))
 			continue;
 
