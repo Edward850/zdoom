@@ -973,7 +973,7 @@ void NetUpdate (void)
 	{
 		I_StartTic ();
 		D_ProcessEvents ();
-		if ((maketic - gametic) / ticdup >= BACKUPTICS/2-1)
+		if (pauseext || (maketic - gametic) / ticdup >= BACKUPTICS/2-1)
 			break;			// can't hold any more
 		
 		//Printf ("mk:%i ",maketic);
@@ -1204,7 +1204,7 @@ void NetUpdate (void)
 
 		// Send current network delay
 		// The number of tics we just made should be removed from the count.
-		netbuffer[k++] = ((maketic - newtics - gametic) / ticdup);
+		netbuffer[k++] = ((maketic - numtics - gametic) / ticdup);
 
 		if (numtics > 0)
 		{
@@ -1810,7 +1810,8 @@ void TryRunTics (void)
 
 	// If paused, do not eat more CPU time than we need, because it
 	// will all be wasted anyway.
-	if (pauseext) r_NoInterpolate = true;
+	if (pauseext) 
+		r_NoInterpolate = true;
 	bool doWait = cl_capfps || r_NoInterpolate /*|| netgame*/;
 
 	// get real tics
@@ -1827,6 +1828,9 @@ void TryRunTics (void)
 
 	// get available tics
 	NetUpdate ();
+
+	if (pauseext)
+		return;
 
 	lowtic = INT_MAX;
 	numplaying = 0;
@@ -1935,7 +1939,7 @@ void TryRunTics (void)
 			C_Ticker ();
 			M_Ticker ();
 			I_GetTime (true);
-			if (!pauseext) G_Ticker();
+			G_Ticker();
 			gametic++;
 
 			NetUpdate ();	// check for new console commands
@@ -2067,7 +2071,7 @@ BYTE *FDynamicBuffer::GetData (int *len)
 }
 
 
-static int KillAll(const PClass *cls)
+static int KillAll(PClassActor *cls)
 {
 	AActor *actor;
 	int killcount = 0;
@@ -2081,6 +2085,33 @@ static int KillAll(const PClass *cls)
 		}
 	}
 	return killcount;
+
+}
+
+static int RemoveClass(const PClass *cls)
+{
+	AActor *actor;
+	int removecount = 0;
+	bool player = false;
+	TThinkerIterator<AActor> iterator(cls);
+	while ((actor = iterator.Next()))
+	{
+		if (actor->IsA(cls))
+		{
+			// [MC]Do not remove LIVE players.
+			if (actor->player != NULL)
+			{
+				player = true;
+				continue;
+			}
+			removecount++; 
+			actor->ClearCounters();
+			actor->Destroy();
+		}
+	}
+	if (player)
+		Printf("Cannot remove live players!\n");
+	return removecount;
 
 }
 // [RH] Execute a special "ticcmd". The type byte should
@@ -2260,7 +2291,7 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 	case DEM_SUMMONFRIEND2:
 	case DEM_SUMMONFOE2:
 		{
-			const PClass *typeinfo;
+			PClassActor *typeinfo;
 			int angle = 0;
 			SWORD tid = 0;
 			BYTE special = 0;
@@ -2275,8 +2306,8 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 				for(i = 0; i < 5; i++) args[i] = ReadLong(stream);
 			}
 
-			typeinfo = PClass::FindClass (s);
-			if (typeinfo != NULL && typeinfo->ActorInfo != NULL)
+			typeinfo = PClass::FindActor(s);
+			if (typeinfo != NULL)
 			{
 				AActor *source = players[player].mo;
 				if (source != NULL)
@@ -2288,10 +2319,9 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 					else
 					{
 						const AActor *def = GetDefaultByType (typeinfo);
-						AActor *spawned = Spawn (typeinfo,
-							source->x + FixedMul (def->radius * 2 + source->radius, finecosine[source->angle>>ANGLETOFINESHIFT]),
-							source->y + FixedMul (def->radius * 2 + source->radius, finesine[source->angle>>ANGLETOFINESHIFT]),
-							source->z + 8 * FRACUNIT, ALLOW_REPLACE);
+						fixedvec3 spawnpos = source->Vec3Angle(def->radius * 2 + source->radius, source->angle, 8 * FRACUNIT);
+
+						AActor *spawned = Spawn (typeinfo, spawnpos, ALLOW_REPLACE);
 						if (spawned != NULL)
 						{
 							if (type == DEM_SUMMONFRIEND || type == DEM_SUMMONFRIEND2 || type == DEM_SUMMONMBF)
@@ -2342,8 +2372,8 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 
 			s = ReadString (stream);
 
-			if (Trace (players[player].mo->x, players[player].mo->y,
-				players[player].mo->z + players[player].mo->height - (players[player].mo->height>>2),
+			if (Trace (players[player].mo->X(), players[player].mo->Y(),
+				players[player].mo->Top() - (players[player].mo->height>>2),
 				players[player].mo->Sector,
 				vx, vy, vz, 172*FRACUNIT, 0, ML_BLOCKEVERYTHING, players[player].mo,
 				trace, TRACE_NoSky))
@@ -2473,7 +2503,7 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 
 	case DEM_RUNSPECIAL:
 		{
-			int snum = ReadByte(stream);
+			int snum = ReadWord(stream);
 			int argn = ReadByte(stream);
 			int arg[5] = { 0, 0, 0, 0, 0 };
 
@@ -2504,7 +2534,7 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 	case DEM_MORPHEX:
 		{
 			s = ReadString (stream);
-			const char *msg = cht_Morph (players + player, PClass::FindClass (s), false);
+			const char *msg = cht_Morph (players + player, dyn_cast<PClassPlayerPawn>(PClass::FindClass (s)), false);
 			if (player == consoleplayer)
 			{
 				Printf ("%s\n", *msg != '\0' ? msg : "Morph failed.");
@@ -2536,12 +2566,12 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 		{
 			char *classname = ReadString (stream);
 			int killcount = 0;
-			const PClass *cls = PClass::FindClass(classname);
+			PClassActor *cls = PClass::FindActor(classname);
 
-			if (cls != NULL && cls->ActorInfo != NULL)
+			if (cls != NULL)
 			{
 				killcount = KillAll(cls);
-				const PClass *cls_rep = cls->GetReplacement();
+				PClassActor *cls_rep = cls->GetReplacement();
 				if (cls != cls_rep)
 				{
 					killcount += KillAll(cls_rep);
@@ -2554,6 +2584,27 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 			}
 
 		}
+		break;
+	case DEM_REMOVE:
+	{
+		char *classname = ReadString(stream);
+		int removecount = 0;
+		PClassActor *cls = PClass::FindActor(classname);
+		if (cls != NULL && cls->IsKindOf(RUNTIME_CLASS(PClassActor)))
+		{
+			removecount = RemoveClass(cls);
+			const PClass *cls_rep = cls->GetReplacement();
+			if (cls != cls_rep)
+			{
+				removecount += RemoveClass(cls_rep);
+			}
+			Printf("Removed %d actors of type %s.\n", removecount, classname);
+		}
+		else
+		{
+			Printf("%s is not an actor class.\n", classname);
+		}
+	}
 		break;
 
 	case DEM_CONVREPLY:
@@ -2582,7 +2633,7 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 			}
 			for(i = 0; i < count; ++i)
 			{
-				const PClass *wpn = Net_ReadWeapon(stream);
+				PClassWeapon *wpn = Net_ReadWeapon(stream);
 				players[pnum].weapons.AddSlot(slot, wpn, pnum == consoleplayer);
 			}
 		}
@@ -2591,7 +2642,7 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 	case DEM_ADDSLOT:
 		{
 			int slot = ReadByte(stream);
-			const PClass *wpn = Net_ReadWeapon(stream);
+			PClassWeapon *wpn = Net_ReadWeapon(stream);
 			players[player].weapons.AddSlot(slot, wpn, player == consoleplayer);
 		}
 		break;
@@ -2599,7 +2650,7 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 	case DEM_ADDSLOTDEFAULT:
 		{
 			int slot = ReadByte(stream);
-			const PClass *wpn = Net_ReadWeapon(stream);
+			PClassWeapon *wpn = Net_ReadWeapon(stream);
 			players[player].weapons.AddSlotDefault(slot, wpn, player == consoleplayer);
 		}
 		break;
@@ -2615,6 +2666,11 @@ void Net_DoCommand (int type, BYTE **stream, int player)
 
 	case DEM_REVERTCAMERA:
 		players[player].camera = players[player].mo;
+		break;
+
+	case DEM_FINISHGAME:
+		// Simulate an end-of-game action
+		G_ChangeLevel(NULL, 0, 0);
 		break;
 
 	default:
@@ -2680,6 +2736,7 @@ void Net_SkipCommand (int type, BYTE **stream)
 		case DEM_SUMMONFRIEND:
 		case DEM_SUMMONFOE:
 		case DEM_SUMMONMBF:
+		case DEM_REMOVE:
 		case DEM_SPRAY:
 		case DEM_MORPHEX:
 		case DEM_KILLCLASSCHEAT:
@@ -2742,7 +2799,7 @@ void Net_SkipCommand (int type, BYTE **stream)
 			break;
 
 		case DEM_RUNSPECIAL:
-			skip = 2 + *(*stream + 1) * 4;
+			skip = 3 + *(*stream + 2) * 4;
 			break;
 
 		case DEM_CONVREPLY:

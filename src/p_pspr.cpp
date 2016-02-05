@@ -38,6 +38,30 @@
 
 // TYPES -------------------------------------------------------------------
 
+struct FGenericButtons
+{
+	int ReadyFlag;			// Flag passed to A_WeaponReady
+	int StateFlag;			// Flag set in WeaponState
+	int ButtonFlag;			// Button to press
+	ENamedName StateName;	// Name of the button/state
+};
+
+enum EWRF_Options
+{
+	WRF_NoBob			= 1,
+	WRF_NoSwitch		= 1 << 1,
+	WRF_NoPrimary		= 1 << 2,
+	WRF_NoSecondary		= 1 << 3,
+	WRF_NoFire = WRF_NoPrimary | WRF_NoSecondary,
+	WRF_AllowReload		= 1 << 4,
+	WRF_AllowZoom		= 1 << 5,
+	WRF_DisableSwitch	= 1 << 6,
+	WRF_AllowUser1		= 1 << 7,
+	WRF_AllowUser2		= 1 << 8,
+	WRF_AllowUser3		= 1 << 9,
+	WRF_AllowUser4		= 1 << 10,
+};
+
 // EXTERNAL FUNCTION PROTOTYPES --------------------------------------------
 
 // PUBLIC FUNCTION PROTOTYPES ----------------------------------------------
@@ -56,6 +80,16 @@ CVAR(Int, sv_fastweapons, false, CVAR_SERVERINFO);
 
 static FRandom pr_wpnreadysnd ("WpnReadySnd");
 static FRandom pr_gunshot ("GunShot");
+
+static const FGenericButtons ButtonChecks[] =
+{
+	{ WRF_AllowZoom,	WF_WEAPONZOOMOK,	BT_ZOOM,	NAME_Zoom },
+	{ WRF_AllowReload,	WF_WEAPONRELOADOK,	BT_RELOAD,	NAME_Reload },
+	{ WRF_AllowUser1,	WF_USER1OK,			BT_USER1,	NAME_User1 },
+	{ WRF_AllowUser2,	WF_USER2OK,			BT_USER2,	NAME_User2 },
+	{ WRF_AllowUser3,	WF_USER3OK,			BT_USER3,	NAME_User3 },
+	{ WRF_AllowUser4,	WF_USER4OK,			BT_USER4,	NAME_User4 },
+};
 
 // CODE --------------------------------------------------------------------
 
@@ -95,7 +129,8 @@ void P_SetPsprite (player_t *player, int position, FState *state, bool nofunctio
 
 	if (position == ps_weapon && !nofunction)
 	{ // A_WeaponReady will re-set these as needed
-		player->WeaponState &= ~(WF_WEAPONREADY | WF_WEAPONREADYALT | WF_WEAPONBOBBING | WF_WEAPONSWITCHOK | WF_WEAPONRELOADOK | WF_WEAPONZOOMOK);
+		player->WeaponState &= ~(WF_WEAPONREADY | WF_WEAPONREADYALT | WF_WEAPONBOBBING | WF_WEAPONSWITCHOK | WF_WEAPONRELOADOK | WF_WEAPONZOOMOK |
+								WF_USER1OK | WF_USER2OK | WF_USER3OK | WF_USER4OK);
 	}
 
 	psp = &player->psprites[position];
@@ -123,8 +158,10 @@ void P_SetPsprite (player_t *player, int position, FState *state, bool nofunctio
 		}
 
 
-		if (sv_fastweapons >= 2 && position == ps_weapon)
-			psp->tics = state->ActionFunc == NULL? 0 : 1;
+		if (sv_fastweapons == 2 && position == ps_weapon)
+			psp->tics = state->ActionFunc == NULL ? 0 : 1;
+		else if (sv_fastweapons == 3)
+			psp->tics = (state->GetTics() != 0);
 		else if (sv_fastweapons)
 			psp->tics = 1;		// great for producing decals :)
 		else
@@ -287,66 +324,6 @@ void P_FireWeaponAlt (player_t *player, FState *state)
 	{
 		P_NoiseAlert (player->mo, player->mo, false);
 	}
-}
-
-//---------------------------------------------------------------------------
-//
-// PROC P_ReloadWeapon
-//
-//---------------------------------------------------------------------------
-
-void P_ReloadWeapon (player_t *player, FState *state)
-{
-	AWeapon *weapon;
-	if (player->Bot == NULL && bot_observer)
-	{
-		return;
-	}
-
-	weapon = player->ReadyWeapon;
-	if (weapon == NULL)
-	{
-		return;
-	}
-
-	if (state == NULL)
-	{
-		state = weapon->GetRelState();
-	}
-	// [XA] don't change state if still null, so if the modder sets 
-	// WRF_RELOAD to true but forgets to define the Reload state, the weapon
-	// won't disappear. ;)
-	if (state != NULL)
-		P_SetPsprite (player, ps_weapon, state);
-}
-
-//---------------------------------------------------------------------------
-//
-// PROC P_ZoomWeapon
-//
-//---------------------------------------------------------------------------
-
-void P_ZoomWeapon (player_t *player, FState *state)
-{
-	AWeapon *weapon;
-	if (player->Bot == NULL && bot_observer)
-	{
-		return;
-	}
-
-	weapon = player->ReadyWeapon;
-	if (weapon == NULL)
-	{
-		return;
-	}
-
-	if (state == NULL)
-	{
-		state = weapon->GetZoomState();
-	}
-	// [XA] don't change state if still null. Same reasons as above.
-	if (state != NULL)
-		P_SetPsprite (player, ps_weapon, state);
 }
 
 //---------------------------------------------------------------------------
@@ -562,22 +539,21 @@ void DoReadyWeaponToBob (AActor *self)
 	}
 }
 
-void DoReadyWeaponToReload (AActor *self)
+void DoReadyWeaponToGeneric(AActor *self, int paramflags)
 {
-	// Prepare for reload action.
-	player_t *player;
-	if (self && (player = self->player))
-		player->WeaponState |= WF_WEAPONRELOADOK;
-	return;
-}
+	int flags = 0;
 
-void DoReadyWeaponToZoom (AActor *self)
-{
-	// Prepare for reload action.
-	player_t *player;
-	if (self && (player = self->player))
-		player->WeaponState |= WF_WEAPONZOOMOK;
-	return;
+	for (size_t i = 0; i < countof(ButtonChecks); ++i)
+	{
+		if (paramflags & ButtonChecks[i].ReadyFlag)
+		{
+			flags |= ButtonChecks[i].StateFlag;
+		}
+	}
+	if (self != NULL && self->player != NULL)
+	{
+		self->player->WeaponState |= flags;
+	}
 }
 
 // This function replaces calls to A_WeaponReady in other codepointers.
@@ -586,34 +562,20 @@ void DoReadyWeapon(AActor *self)
 	DoReadyWeaponToBob(self);
 	DoReadyWeaponToFire(self);
 	DoReadyWeaponToSwitch(self);
-	DoReadyWeaponToReload(self);
-	DoReadyWeaponToZoom(self);
+	DoReadyWeaponToGeneric(self, ~0);
 }
-
-enum EWRF_Options
-{
-	WRF_NoBob = 1,
-	WRF_NoSwitch = 2,
-	WRF_NoPrimary = 4,
-	WRF_NoSecondary = 8,
-	WRF_NoFire = WRF_NoPrimary + WRF_NoSecondary,
-	WRF_AllowReload = 16,
-	WRF_AllowZoom = 32,
-	WRF_DisableSwitch = 64,
-};
 
 DEFINE_ACTION_FUNCTION_PARAMS(AInventory, A_WeaponReady)
 {
-	ACTION_PARAM_START(1);
-	ACTION_PARAM_INT(paramflags, 0);
+	PARAM_ACTION_PROLOGUE;
+	PARAM_INT_OPT(flags)	{ flags = 0; }
 
-													DoReadyWeaponToSwitch(self, !(paramflags & WRF_NoSwitch));
-	if ((paramflags & WRF_NoFire) != WRF_NoFire)	DoReadyWeaponToFire(self, !(paramflags & WRF_NoPrimary), !(paramflags & WRF_NoSecondary));
-	if (!(paramflags & WRF_NoBob))					DoReadyWeaponToBob(self);
-	if ((paramflags & WRF_AllowReload))				DoReadyWeaponToReload(self);
-	if ((paramflags & WRF_AllowZoom))				DoReadyWeaponToZoom(self);
-
-	DoReadyWeaponDisableSwitch(self, paramflags & WRF_DisableSwitch);
+													DoReadyWeaponToSwitch(self, !(flags & WRF_NoSwitch));
+	if ((flags & WRF_NoFire) != WRF_NoFire)			DoReadyWeaponToFire(self, !(flags & WRF_NoPrimary), !(flags & WRF_NoSecondary));
+	if (!(flags & WRF_NoBob))						DoReadyWeaponToBob(self);
+													DoReadyWeaponToGeneric(self, flags);
+	DoReadyWeaponDisableSwitch(self, flags & WRF_DisableSwitch);
+	return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -690,45 +652,40 @@ void P_CheckWeaponSwitch (player_t *player)
 
 //---------------------------------------------------------------------------
 //
-// PROC P_CheckWeaponReload
+// PROC P_CheckWeaponButtons
 //
-// The player can reload the weapon.
+// Check extra button presses for weapons.
 //
 //---------------------------------------------------------------------------
 
-void P_CheckWeaponReload (player_t *player)
+static void P_CheckWeaponButtons (player_t *player)
 {
-	AWeapon *weapon = player->ReadyWeapon;
-
-	if (weapon == NULL)
-		return;
-
-	// Check for reload.
-	if ((player->WeaponState & WF_WEAPONRELOADOK) && (player->cmd.ucmd.buttons & BT_RELOAD))
+	if (player->Bot == NULL && bot_observer)
 	{
-		P_ReloadWeapon (player, NULL);
+		return;
 	}
-}
-
-//---------------------------------------------------------------------------
-//
-// PROC P_CheckWeaponZoom
-//
-// The player can use the weapon's zoom function.
-//
-//---------------------------------------------------------------------------
-
-void P_CheckWeaponZoom (player_t *player)
-{
 	AWeapon *weapon = player->ReadyWeapon;
-
 	if (weapon == NULL)
-		return;
-
-	// Check for zoom.
-	if ((player->WeaponState & WF_WEAPONZOOMOK) && (player->cmd.ucmd.buttons & BT_ZOOM))
 	{
-		P_ZoomWeapon (player, NULL);
+		return;
+	}
+	// The button checks are ordered by precedence. The first one to match a
+	// button press and affect a state change wins.
+	for (size_t i = 0; i < countof(ButtonChecks); ++i)
+	{
+		if ((player->WeaponState & ButtonChecks[i].StateFlag) &&
+			(player->cmd.ucmd.buttons & ButtonChecks[i].ButtonFlag))
+		{
+			FState *state = weapon->GetStateForButtonName(ButtonChecks[i].StateName);
+			// [XA] don't change state if still null, so if the modder
+			// sets WRF_xxx to true but forgets to define the corresponding
+			// state, the weapon won't disappear. ;)
+			if (state != NULL)
+			{
+				P_SetPsprite(player, ps_weapon, state);
+				return;
+	}
+		}
 	}
 }
 
@@ -742,10 +699,10 @@ void P_CheckWeaponZoom (player_t *player)
 
 DEFINE_ACTION_FUNCTION_PARAMS(AInventory, A_ReFire)
 {
-	ACTION_PARAM_START(1)
-	ACTION_PARAM_STATE(state, 0);
-
+	PARAM_ACTION_PROLOGUE;
+	PARAM_STATE_OPT(state)	{ state = NULL; }
 	A_ReFire(self, state);
+	return 0;
 }
 
 void A_ReFire(AActor *self, FState *state)
@@ -780,12 +737,14 @@ void A_ReFire(AActor *self, FState *state)
 
 DEFINE_ACTION_FUNCTION(AInventory, A_ClearReFire)
 {
+	PARAM_ACTION_PROLOGUE;
 	player_t *player = self->player;
 
 	if (NULL != player)
 	{
 		player->refire = 0;
 	}
+	return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -800,12 +759,15 @@ DEFINE_ACTION_FUNCTION(AInventory, A_ClearReFire)
 
 DEFINE_ACTION_FUNCTION(AInventory, A_CheckReload)
 {
+	PARAM_ACTION_PROLOGUE;
+
 	if (self->player != NULL)
 	{
 		self->player->ReadyWeapon->CheckAmmo (
 			self->player->ReadyWeapon->bAltFire ? AWeapon::AltFire
 			: AWeapon::PrimaryFire, true);
 	}
+	return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -816,12 +778,14 @@ DEFINE_ACTION_FUNCTION(AInventory, A_CheckReload)
 
 DEFINE_ACTION_FUNCTION(AInventory, A_Lower)
 {
+	PARAM_ACTION_PROLOGUE;
+
 	player_t *player = self->player;
 	pspdef_t *psp;
 
 	if (NULL == player)
 	{
-		return;
+		return 0;
 	}
 	psp = &player->psprites[ps_weapon];
 	if (player->morphTics || player->cheats & CF_INSTANTWEAPSWITCH)
@@ -834,7 +798,7 @@ DEFINE_ACTION_FUNCTION(AInventory, A_Lower)
 	}
 	if (psp->sy < WEAPONBOTTOM)
 	{ // Not lowered all the way yet
-		return;
+		return 0;
 	}
 	if (player->playerstate == PST_DEAD)
 	{ // Player is dead, so don't bring up a pending weapon
@@ -842,11 +806,12 @@ DEFINE_ACTION_FUNCTION(AInventory, A_Lower)
 	
 		// Player is dead, so keep the weapon off screen
 		P_SetPsprite (player,  ps_weapon, NULL);
-		return;
+		return 0;
 	}
 	// [RH] Clear the flash state. Only needed for Strife.
 	P_SetPsprite (player, ps_flash, NULL);
 	P_BringUpWeapon (player);
+	return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -857,27 +822,29 @@ DEFINE_ACTION_FUNCTION(AInventory, A_Lower)
 
 DEFINE_ACTION_FUNCTION(AInventory, A_Raise)
 {
+	PARAM_ACTION_PROLOGUE;
+
 	if (self == NULL)
 	{
-		return;
+		return 0;
 	}
 	player_t *player = self->player;
 	pspdef_t *psp;
 
 	if (NULL == player)
 	{
-		return;
+		return 0;
 	}
 	if (player->PendingWeapon != WP_NOCHANGE)
 	{
 		P_DropWeapon(player);
-		return;
+		return 0;
 	}
 	psp = &player->psprites[ps_weapon];
 	psp->sy -= RAISESPEED;
 	if (psp->sy > WEAPONTOP)
 	{ // Not raised all the way yet
-		return;
+		return 0;
 	}
 	psp->sy = WEAPONTOP;
 	if (player->ReadyWeapon != NULL)
@@ -888,6 +855,7 @@ DEFINE_ACTION_FUNCTION(AInventory, A_Raise)
 	{
 		player->psprites[ps_weapon].state = NULL;
 	}
+	return 0;
 }
 
 
@@ -903,24 +871,33 @@ enum GF_Flags
 
 DEFINE_ACTION_FUNCTION_PARAMS(AInventory, A_GunFlash)
 {
-	ACTION_PARAM_START(2)
-	ACTION_PARAM_STATE(flash, 0);
-	ACTION_PARAM_INT(Flags, 1);
+	PARAM_ACTION_PROLOGUE;
+	PARAM_STATE_OPT(flash)	{ flash = NULL; }
+	PARAM_INT_OPT  (flags)	{ flags = 0; }
 
 	player_t *player = self->player;
 
 	if (NULL == player)
 	{
-		return;
+		return 0;
 	}
-	if(!(Flags & GFF_NOEXTCHANGE)) player->mo->PlayAttacking2 ();
-
+	if (!(flags & GFF_NOEXTCHANGE))
+	{
+		player->mo->PlayAttacking2 ();
+	}
 	if (flash == NULL)
 	{
-		if (player->ReadyWeapon->bAltFire) flash = player->ReadyWeapon->FindState(NAME_AltFlash);
-		if (flash == NULL) flash = player->ReadyWeapon->FindState(NAME_Flash);
+		if (player->ReadyWeapon->bAltFire)
+		{
+			flash = player->ReadyWeapon->FindState(NAME_AltFlash);
+		}
+		if (flash == NULL)
+		{
+			flash = player->ReadyWeapon->FindState(NAME_Flash);
+		}
 	}
 	P_SetPsprite (player, ps_flash, flash);
+	return 0;
 }
 
 
@@ -937,7 +914,7 @@ DEFINE_ACTION_FUNCTION_PARAMS(AInventory, A_GunFlash)
 
 angle_t P_BulletSlope (AActor *mo, AActor **pLineTarget)
 {
-	static const int angdiff[3] = { -1<<26, 1<<26, 0 };
+	static const int angdiff[3] = { -(1<<26), 1<<26, 0 };
 	int i;
 	angle_t an;
 	angle_t pitch;
@@ -968,7 +945,7 @@ angle_t P_BulletSlope (AActor *mo, AActor **pLineTarget)
 //
 // P_GunShot
 //
-void P_GunShot (AActor *mo, bool accurate, const PClass *pufftype, angle_t pitch)
+void P_GunShot (AActor *mo, bool accurate, PClassActor *pufftype, angle_t pitch)
 {
 	angle_t 	angle;
 	int 		damage;
@@ -986,37 +963,47 @@ void P_GunShot (AActor *mo, bool accurate, const PClass *pufftype, angle_t pitch
 
 DEFINE_ACTION_FUNCTION(AInventory, A_Light0)
 {
+	PARAM_ACTION_PROLOGUE;
+
 	if (self->player != NULL)
 	{
 		self->player->extralight = 0;
 	}
+	return 0;
 }
 
 DEFINE_ACTION_FUNCTION(AInventory, A_Light1)
 {
+	PARAM_ACTION_PROLOGUE;
+
 	if (self->player != NULL)
 	{
 		self->player->extralight = 1;
 	}
+	return 0;
 }
 
 DEFINE_ACTION_FUNCTION(AInventory, A_Light2)
 {
+	PARAM_ACTION_PROLOGUE;
+
 	if (self->player != NULL)
 	{
 		self->player->extralight = 2;
 	}
+	return 0;
 }
 
 DEFINE_ACTION_FUNCTION_PARAMS(AInventory, A_Light)
 {
-	ACTION_PARAM_START(1);
-	ACTION_PARAM_INT(light, 0);
+	PARAM_ACTION_PROLOGUE;
+	PARAM_INT(light);
 
 	if (self->player != NULL)
 	{
 		self->player->extralight = clamp<int>(light, -20, 20);
 	}
+	return 0;
 }
 
 //------------------------------------------------------------------------
@@ -1095,15 +1082,10 @@ void P_MovePsprites (player_t *player)
 		{
 			P_CheckWeaponFire (player);
 		}
-		if (player->WeaponState & WF_WEAPONRELOADOK)
-		{
-			P_CheckWeaponReload (player);
+
+		// Check custom buttons
+		P_CheckWeaponButtons(player);
 		}
-		if (player->WeaponState & WF_WEAPONZOOMOK)
-		{
-			P_CheckWeaponZoom (player);
-		}
-	}
 }
 
 FArchive &operator<< (FArchive &arc, pspdef_t &def)

@@ -45,9 +45,7 @@ struct cluster_info_t;
 class FScanner;
 
 #if defined(_MSC_VER)
-#pragma data_seg(".yreg$u")
-#pragma data_seg()
-
+#pragma section(".yreg$u",read)
 #define MSVC_YSEG __declspec(allocate(".yreg$u"))
 #define GCC_YSEG
 #else
@@ -339,7 +337,7 @@ struct level_info_t
 	TArray<FSpecialAction> specialactions;
 
 	TArray<FSoundID> PrecacheSounds;
-	TArray<FTextureID> PrecacheTextures;
+	TArray<FString> PrecacheTextures;
 
 	level_info_t() 
 	{ 
@@ -563,8 +561,10 @@ enum ESkillProperty
 	SKILLP_FriendlyHealth,
 	SKILLP_NoPain,
 	SKILLP_ArmorFactor,
+	SKILLP_HealthFactor,
 	SKILLP_EasyKey,
 	SKILLP_SlowMonsters,
+	SKILLP_Infight,
 };
 int G_SkillProperty(ESkillProperty prop);
 const char * G_SkillName();
@@ -602,7 +602,9 @@ struct FSkillInfo
 	fixed_t MonsterHealth;
 	fixed_t FriendlyHealth;
 	bool NoPain;
+	int Infighting;
 	fixed_t ArmorFactor;
+	fixed_t HealthFactor;
 
 	FSkillInfo() {}
 	FSkillInfo(const FSkillInfo &other)

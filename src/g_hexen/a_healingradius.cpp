@@ -30,14 +30,19 @@ IMPLEMENT_CLASS (AArtiHealingRadius)
 bool AArtiHealingRadius::Use (bool pickup)
 {
 	bool effective = false;
-	int mode = Owner->GetClass()->Meta.GetMetaInt(APMETA_HealingRadius);
+	FName mode;
+	
+	if (Owner->IsKindOf(RUNTIME_CLASS(APlayerPawn)))
+	{
+		mode = static_cast<PClassPlayerPawn *>(Owner->GetClass())->HealingRadiusType;
+	}
 
 	for (int i = 0; i < MAXPLAYERS; ++i)
 	{
 		if (playeringame[i] &&
 			players[i].mo != NULL &&
 			players[i].mo->health > 0 &&
-			P_AproxDistance (players[i].mo->x - Owner->x, players[i].mo->y - Owner->y) <= HEAL_RADIUS_DIST)
+			players[i].mo->AproxDistance (Owner) <= HEAL_RADIUS_DIST)
 		{
 			// Q: Is it worth it to make this selectable as a player property?
 			// A: Probably not - but it sure doesn't hurt.
@@ -65,8 +70,8 @@ bool AArtiHealingRadius::Use (bool pickup)
 			{
 				int amount = 50 + (pr_healradius() % 50);
 
-				if (players[i].mo->GiveAmmo (PClass::FindClass(NAME_Mana1), amount) ||
-					players[i].mo->GiveAmmo (PClass::FindClass(NAME_Mana2), amount))
+				if (players[i].mo->GiveAmmo (dyn_cast<PClassAmmo>(PClass::FindClass(NAME_Mana1)), amount) ||
+					players[i].mo->GiveAmmo (dyn_cast<PClassAmmo>(PClass::FindClass(NAME_Mana2)), amount))
 				{
 					gotsome = true;
 				}

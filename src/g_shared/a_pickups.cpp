@@ -22,6 +22,41 @@
 
 static FRandom pr_restore ("RestorePos");
 
+IMPLEMENT_CLASS(PClassInventory)
+
+PClassInventory::PClassInventory()
+{
+	GiveQuest = 0;
+	AltHUDIcon.SetNull();
+}
+
+void PClassInventory::Derive(PClass *newclass)
+{
+	assert(newclass->IsKindOf(RUNTIME_CLASS(PClassInventory)));
+	Super::Derive(newclass);
+	PClassInventory *newc = static_cast<PClassInventory *>(newclass);
+
+	newc->PickupMessage = PickupMessage;
+	newc->GiveQuest = GiveQuest;
+	newc->AltHUDIcon = AltHUDIcon;
+}
+
+IMPLEMENT_CLASS(PClassAmmo)
+
+PClassAmmo::PClassAmmo()
+{
+	DropAmount = 0;
+}
+
+void PClassAmmo::Derive(PClass *newclass)
+{
+	assert(newclass->IsKindOf(RUNTIME_CLASS(PClassAmmo)));
+	Super::Derive(newclass);
+	PClassAmmo *newc = static_cast<PClassAmmo *>(newclass);
+
+	newc->DropAmount = DropAmount;
+}
+
 IMPLEMENT_CLASS (AAmmo)
 
 //===========================================================================
@@ -53,15 +88,15 @@ void AAmmo::Serialize (FArchive &arc)
 //
 //===========================================================================
 
-const PClass *AAmmo::GetParentAmmo () const
+PClassActor *AAmmo::GetParentAmmo () const
 {
-	const PClass *type = GetClass ();
+	PClass *type = GetClass();
 
 	while (type->ParentClass != RUNTIME_CLASS(AAmmo) && type->ParentClass != NULL)
 	{
 		type = type->ParentClass;
 	}
-	return type;
+	return static_cast<PClassActor *>(type);
 }
 
 //===========================================================================
@@ -139,8 +174,7 @@ AInventory *AAmmo::CreateCopy (AActor *other)
 
 	if (GetClass()->ParentClass != RUNTIME_CLASS(AAmmo) && GetClass() != RUNTIME_CLASS(AAmmo))
 	{
-		const PClass *type = GetParentAmmo();
-		assert (type->ActorInfo != NULL);
+		PClassActor *type = GetParentAmmo();
 		if (!GoAway ())
 		{
 			Destroy ();
@@ -236,10 +270,12 @@ bool P_GiveBody (AActor *actor, int num, int max)
 				return true;
 			}
 		}
-		else
+		else if (num > 0)
 		{
 			if (player->health < max)
 			{
+				num = FixedMul(num, G_SkillProperty(SKILLP_HealthFactor));
+				if (num < 1) num = 1;
 				player->health += num;
 				if (player->health > max)
 				{
@@ -287,11 +323,14 @@ bool P_GiveBody (AActor *actor, int num, int max)
 
 DEFINE_ACTION_FUNCTION(AActor, A_RestoreSpecialThing1)
 {
+	PARAM_ACTION_PROLOGUE;
+
 	self->renderflags &= ~RF_INVISIBLE;
 	if (static_cast<AInventory *>(self)->DoRespawn ())
 	{
 		S_Sound (self, CHAN_VOICE, "misc/spawn", 1, ATTN_IDLE);
 	}
+	return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -302,12 +341,15 @@ DEFINE_ACTION_FUNCTION(AActor, A_RestoreSpecialThing1)
 
 DEFINE_ACTION_FUNCTION(AActor, A_RestoreSpecialThing2)
 {
+	PARAM_ACTION_PROLOGUE;
+
 	self->flags |= MF_SPECIAL;
 	if (!(self->GetDefault()->flags & MF_NOGRAVITY))
 	{
 		self->flags &= ~MF_NOGRAVITY;
 	}
 	self->SetState (self->SpawnState);
+	return 0;
 }
 
 
@@ -319,6 +361,8 @@ DEFINE_ACTION_FUNCTION(AActor, A_RestoreSpecialThing2)
 
 DEFINE_ACTION_FUNCTION(AActor, A_RestoreSpecialDoomThing)
 {
+	PARAM_ACTION_PROLOGUE;
+
 	self->renderflags &= ~RF_INVISIBLE;
 	self->flags |= MF_SPECIAL;
 	if (!(self->GetDefault()->flags & MF_NOGRAVITY))
@@ -329,8 +373,9 @@ DEFINE_ACTION_FUNCTION(AActor, A_RestoreSpecialDoomThing)
 	{
 		self->SetState (self->SpawnState);
 		S_Sound (self, CHAN_VOICE, "misc/spawn", 1, ATTN_IDLE);
-		Spawn ("ItemFog", self->x, self->y, self->z, ALLOW_REPLACE);
+		Spawn ("ItemFog", self->Pos(), ALLOW_REPLACE);
 	}
+	return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -341,6 +386,8 @@ DEFINE_ACTION_FUNCTION(AActor, A_RestoreSpecialDoomThing)
 
 DEFINE_ACTION_FUNCTION(AActor, A_RestoreSpecialPosition)
 {
+	PARAM_ACTION_PROLOGUE;
+
 	// Move item back to its original location
 	fixed_t _x, _y;
 	sector_t *sec;
@@ -349,19 +396,18 @@ DEFINE_ACTION_FUNCTION(AActor, A_RestoreSpecialPosition)
 	_y = self->SpawnPoint[1];
 
 	self->UnlinkFromWorld();
-	self->x = _x;
-	self->y = _y;
+	self->SetXY(_x, _y);
 	self->LinkToWorld(true);
 	sec = self->Sector;
-	self->z =
 	self->dropoffz =
 	self->floorz = sec->floorplane.ZatPoint(_x, _y);
 	self->ceilingz = sec->ceilingplane.ZatPoint(_x, _y);
+	self->SetZ(self->floorz);
 	P_FindFloorCeiling(self, FFCF_ONLYSPAWNPOS);
 
 	if (self->flags & MF_SPAWNCEILING)
 	{
-		self->z = self->ceilingz - self->height - self->SpawnPoint[2];
+		self->SetZ(self->ceilingz - self->height - self->SpawnPoint[2]);
 	}
 	else if (self->flags2 & MF2_SPAWNFLOAT)
 	{
@@ -369,33 +415,34 @@ DEFINE_ACTION_FUNCTION(AActor, A_RestoreSpecialPosition)
 		if (space > 48*FRACUNIT)
 		{
 			space -= 40*FRACUNIT;
-			self->z = ((space * pr_restore())>>8) + self->floorz + 40*FRACUNIT;
+			self->SetZ(((space * pr_restore())>>8) + self->floorz + 40*FRACUNIT);
 		}
 		else
 		{
-			self->z = self->floorz;
+			self->SetZ(self->floorz);
 		}
 	}
 	else
 	{
-		self->z = self->SpawnPoint[2] + self->floorz;
+		self->SetZ(self->SpawnPoint[2] + self->floorz);
 	}
 	// Redo floor/ceiling check, in case of 3D floors
 	P_FindFloorCeiling(self, FFCF_SAMESECTOR | FFCF_ONLY3DFLOORS | FFCF_3DRESTRICT);
-	if (self->z < self->floorz)
+	if (self->Z() < self->floorz)
 	{ // Do not reappear under the floor, even if that's where we were for the
 	  // initial spawn.
-		self->z = self->floorz;
+		self->SetZ(self->floorz);
 	}
-	if ((self->flags & MF_SOLID) && (self->z + self->height > self->ceilingz))
+	if ((self->flags & MF_SOLID) && (self->Top() > self->ceilingz))
 	{ // Do the same for the ceiling.
-		self->z = self->ceilingz - self->height;
+		self->SetZ(self->ceilingz - self->height);
 	}
 	// Do not interpolate from the position the actor was at when it was
 	// picked up, in case that is different from where it is now.
-	self->PrevX = self->x;
-	self->PrevY = self->y;
-	self->PrevZ = self->z;
+	self->PrevX = self->X();
+	self->PrevY = self->Y();
+	self->PrevZ = self->Z();
+	return 0;
 }
 
 int AInventory::StaticLastMessageTic;
@@ -680,6 +727,7 @@ AInventory *AInventory::CreateCopy (AActor *other)
 {
 	AInventory *copy;
 
+	Amount = MIN(Amount, MaxAmount);
 	if (GoAway ())
 	{
 		copy = static_cast<AInventory *>(Spawn (GetClass(), 0, 0, 0, NO_REPLACE));
@@ -725,8 +773,7 @@ AInventory *AInventory::CreateTossable ()
 		flags &= ~(MF_SPECIAL|MF_SOLID);
 		return this;
 	}
-	copy = static_cast<AInventory *>(Spawn (GetClass(), Owner->x,
-		Owner->y, Owner->z, NO_REPLACE));
+	copy = static_cast<AInventory *>(Spawn (GetClass(), Owner->Pos(), NO_REPLACE));
 	if (copy != NULL)
 	{
 		copy->MaxAmount = MaxAmount;
@@ -852,6 +899,25 @@ fixed_t AInventory::GetSpeedFactor ()
 
 //===========================================================================
 //
+// AInventory :: GetNoTeleportFreeze
+//
+//===========================================================================
+
+bool AInventory::GetNoTeleportFreeze ()
+{
+	// do not check the flag here because it's only active when used on PowerUps, not on PowerupGivers.
+	if (Inventory != NULL)
+	{
+		return Inventory->GetNoTeleportFreeze();
+	}
+	else
+	{
+		return false;
+	}
+}
+
+//===========================================================================
+//
 // AInventory :: AlterWeaponSprite
 //
 // Allows inventory items to alter a player's weapon sprite just before it
@@ -959,10 +1025,12 @@ static void PrintPickupMessage (const char *str)
 
 void AInventory::Touch (AActor *toucher)
 {
+	player_t *player = toucher->player;
+
 	// If a voodoo doll touches something, pretend the real player touched it instead.
-	if (toucher->player != NULL)
+	if (player != NULL)
 	{
-		toucher = toucher->player->mo;
+		toucher = player->mo;
 	}
 
 	bool localview = toucher->CheckLocalView(consoleplayer);
@@ -972,7 +1040,7 @@ void AInventory::Touch (AActor *toucher)
 	// This is the only situation when a pickup flash should ever play.
 	if (PickupFlash != NULL && !ShouldStay())
 	{
-		Spawn(PickupFlash, x, y, z, ALLOW_REPLACE);
+		Spawn(PickupFlash, Pos(), ALLOW_REPLACE);
 	}
 
 	if (!(ItemFlags & IF_QUIET))
@@ -990,12 +1058,12 @@ void AInventory::Touch (AActor *toucher)
 
 		// Special check so voodoo dolls picking up items cause the
 		// real player to make noise.
-		if (toucher->player != NULL)
+		if (player != NULL)
 		{
-			PlayPickupSound (toucher->player->mo);
+			PlayPickupSound (player->mo);
 			if (!(ItemFlags & IF_NOSCREENFLASH))
 			{
-				toucher->player->bonuscount = BONUSADD;
+				player->bonuscount = BONUSADD;
 			}
 		}
 		else
@@ -1009,16 +1077,16 @@ void AInventory::Touch (AActor *toucher)
 
 	if (flags & MF_COUNTITEM)
 	{
-		if (toucher->player != NULL)
+		if (player != NULL)
 		{
-			toucher->player->itemcount++;
+			player->itemcount++;
 		}
 		level.found_items++;
 	}
 
 	if (flags5 & MF5_COUNTSECRET)
 	{
-		P_GiveSecret(toucher, true, true, -1);
+		P_GiveSecret(player != NULL? (AActor*)player->mo : toucher, true, true, -1);
 	}
 
 	//Added by MC: Check if item taken was the roam destination of any bot
@@ -1057,7 +1125,7 @@ void AInventory::DoPickupSpecial (AActor *toucher)
 
 const char *AInventory::PickupMessage ()
 {
-	return GetClass()->Meta.GetMetaString (AIMETA_PickupMessage);
+	return GetClass()->PickupMessage;
 }
 
 //===========================================================================
@@ -1268,8 +1336,8 @@ bool AInventory::DoRespawn ()
 		if (state != NULL) spot = state->GetRandomSpot(SpawnPointClass);
 		if (spot != NULL) 
 		{
-			SetOrigin (spot->x, spot->y, spot->z);
-			z = floorz;
+			SetOrigin (spot->Pos(), false);
+			SetZ(floorz);
 		}
 	}
 	return true;
@@ -1284,8 +1352,8 @@ bool AInventory::DoRespawn ()
 
 void AInventory::GiveQuest (AActor *toucher)
 {
-	int quest = GetClass()->Meta.GetMetaInt(AIMETA_GiveQuest);
-	if (quest>0 && quest<31)
+	int quest = GetClass()->GiveQuest;
+	if (quest > 0 && quest <= (int)countof(QuestItemClasses))
 	{
 		toucher->GiveInventoryType (QuestItemClasses[quest-1]);
 	}
@@ -1456,7 +1524,7 @@ bool AInventory::CanPickup (AActor *toucher)
 	if (!toucher)
 		return false;
 
-	FActorInfo *ai = GetClass()->ActorInfo;
+	PClassActor *ai = GetClass();
 	// Is the item restricted to certain player classes?
 	if (ai->RestrictedToPlayerClass.Size() != 0)
 	{
@@ -1585,6 +1653,35 @@ bool ACustomInventory::TryPickup (AActor *&toucher)
 	return useok;
 }
 
+IMPLEMENT_CLASS(PClassHealth)
+
+//===========================================================================
+//
+// PClassHealth Constructor
+//
+//===========================================================================
+
+PClassHealth::PClassHealth()
+{
+	LowHealth = 0;
+}
+
+//===========================================================================
+//
+// PClassHealth :: Derive
+//
+//===========================================================================
+
+void PClassHealth::Derive(PClass *newclass)
+{
+	assert(newclass->IsKindOf(RUNTIME_CLASS(PClassHealth)));
+	Super::Derive(newclass);
+	PClassHealth *newc = static_cast<PClassHealth *>(newclass);
+	
+	newc->LowHealth = LowHealth;
+	newc->LowHealthMessage = LowHealthMessage;
+}
+
 IMPLEMENT_CLASS (AHealth)
 
 //===========================================================================
@@ -1594,13 +1691,13 @@ IMPLEMENT_CLASS (AHealth)
 //===========================================================================
 const char *AHealth::PickupMessage ()
 {
-	int threshold = GetClass()->Meta.GetMetaInt(AIMETA_LowHealth, 0);
+	int threshold = GetClass()->LowHealth;
 
 	if (PrevHealth < threshold)
 	{
-		const char *message = GetClass()->Meta.GetMetaString (AIMETA_LowHealthMessage);
+		FString message = GetClass()->LowHealthMessage;
 
-		if (message != NULL)
+		if (message.IsNotEmpty())
 		{
 			return message;
 		}
@@ -1730,13 +1827,14 @@ AInventory *ABackpackItem::CreateCopy (AActor *other)
 {
 	// Find every unique type of ammo. Give it to the player if
 	// he doesn't have it already, and double its maximum capacity.
-	for (unsigned int i = 0; i < PClass::m_Types.Size(); ++i)
+	for (unsigned int i = 0; i < PClassActor::AllActorClasses.Size(); ++i)
 	{
-		const PClass *type = PClass::m_Types[i];
+		PClass *type = PClassActor::AllActorClasses[i];
 
 		if (type->ParentClass == RUNTIME_CLASS(AAmmo))
 		{
-			AAmmo *ammo = static_cast<AAmmo *>(other->FindInventory (type));
+			PClassActor *atype = static_cast<PClassActor *>(type);
+			AAmmo *ammo = static_cast<AAmmo *>(other->FindInventory(atype));
 			int amount = static_cast<AAmmo *>(GetDefaultByType(type))->BackpackAmount;
 			// extra ammo in baby mode and nightmare mode
 			if (!(ItemFlags&IF_IGNORESKILL))
@@ -1746,7 +1844,7 @@ AInventory *ABackpackItem::CreateCopy (AActor *other)
 			if (amount < 0) amount = 0;
 			if (ammo == NULL)
 			{ // The player did not have the ammo. Add it.
-				ammo = static_cast<AAmmo *>(Spawn (type, 0, 0, 0, NO_REPLACE));
+				ammo = static_cast<AAmmo *>(Spawn(atype, 0, 0, 0, NO_REPLACE));
 				ammo->Amount = bDepleted ? 0 : amount;
 				if (ammo->BackpackMaxAmount > ammo->MaxAmount)
 				{

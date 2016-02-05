@@ -366,7 +366,7 @@ int FMugShot::UpdateState(player_t *player, StateFlags stateflags)
 				if (player->mo != NULL)
 				{
 					// The next 12 lines are from the Doom statusbar code.
-					badguyangle = R_PointToAngle2(player->mo->x, player->mo->y, player->attacker->x, player->attacker->y);
+					badguyangle = player->mo->AngleTo(player->attacker);
 					if (badguyangle > player->mo->angle)
 					{
 						// whether right or left
@@ -502,7 +502,7 @@ FTexture *FMugShot::GetFace(player_t *player, const char *default_face, int accu
 	}
 	if (CurrentState != NULL)
 	{
-		const char *skin_face = player->morphTics ? player->MorphedPlayerClass->Meta.GetMetaString(APMETA_Face) : skins[player->userinfo.GetSkin()].face;
+		const char *skin_face = player->morphTics ? player->MorphedPlayerClass->Face : skins[player->userinfo.GetSkin()].face;
 		return CurrentState->GetCurrentFrameTexture(default_face, skin_face, level, angle);
 	}
 	return NULL;

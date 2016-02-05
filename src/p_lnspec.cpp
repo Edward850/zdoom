@@ -56,7 +56,21 @@
 #include "p_3dmidtex.h"
 #include "d_net.h"
 #include "d_event.h"
+#include "gstrings.h"
 #include "r_data/colormaps.h"
+#include "fragglescript/t_fs.h"
+
+// Remaps EE sector change types to Generic_Floor values. According to the Eternity Wiki:
+/*
+    0 : No texture or type change. ( = 0)
+    1 : Copy texture, zero type; trigger model. ( = 1)
+    2 : Copy texture, zero type; numeric model. ( = 1+4)
+    3 : Copy texture, preserve type; trigger model. ( = 3)
+    4 : Copy texture, preserve type; numeric model. ( = 3+4)
+    5 : Copy texture and type; trigger model.  ( = 2)
+    6 : Copy texture and type; numeric model.  ( = 2+4)
+*/
+static const BYTE ChangeMap[8] = { 0, 1, 5, 3, 7, 2, 6, 0 };
 
 #define FUNC(a) static int a (line_t *ln, AActor *it, bool backSide, \
 	int arg0, int arg1, int arg2, int arg3, int arg4)
@@ -65,7 +79,9 @@
 #define TICS(a)			(((a)*TICRATE)/35)
 #define OCTICS(a)		(((a)*TICRATE)/8)
 #define	BYTEANGLE(a)	((angle_t)((a)<<24))
+#define CRUSH(a)		((a) > 0? (a) : -1)
 #define CRUSHTYPE(a)	((a)==1? false : (a)==2? true : gameinfo.gametype == GAME_Hexen)
+#define CHANGE(a)		(((a) >= 0 && (a)<=7)? ChangeMap[a]:0)
 
 static FRandom pr_glass ("GlassBreak");
 
@@ -147,7 +163,7 @@ FUNC(LS_Polyobj_MoveToSpot)
 	FActorIterator iterator (arg2);
 	AActor *spot = iterator.Next();
 	if (spot == NULL) return false;
-	return EV_MovePolyTo (ln, arg0, SPEED(arg1), spot->x, spot->y, false);
+	return EV_MovePolyTo (ln, arg0, SPEED(arg1), spot->X(), spot->Y(), false);
 }
 
 FUNC(LS_Polyobj_DoorSwing)
@@ -198,7 +214,7 @@ FUNC(LS_Polyobj_OR_MoveToSpot)
 	FActorIterator iterator (arg2);
 	AActor *spot = iterator.Next();
 	if (spot == NULL) return false;
-	return EV_MovePolyTo (ln, arg0, SPEED(arg1), spot->x, spot->y, true);
+	return EV_MovePolyTo (ln, arg0, SPEED(arg1), spot->X(), spot->Y(), true);
 }
 
 FUNC(LS_Polyobj_Stop)
@@ -236,6 +252,18 @@ FUNC(LS_Door_CloseWaitOpen)
 // Door_CloseWaitOpen (tag, speed, delay, lighttag)
 {
 	return EV_DoDoor (DDoor::doorCloseWaitOpen, ln, it, arg0, SPEED(arg1), OCTICS(arg2), 0, arg3);
+}
+
+FUNC(LS_Door_WaitRaise)
+// Door_WaitRaise(tag, speed, delay, wait, lighttag)
+{
+	return EV_DoDoor(DDoor::doorWaitRaise, ln, it, arg0, SPEED(arg1), TICS(arg2), 0, arg4, false, TICS(arg3));
+}
+
+FUNC(LS_Door_WaitClose)
+// Door_WaitRaise(tag, speed, wait, lighttag)
+{
+	return EV_DoDoor(DDoor::doorWaitClose, ln, it, arg0, SPEED(arg1), 0, 0, arg3, false, TICS(arg2));
 }
 
 FUNC(LS_Door_Animated)
@@ -279,15 +307,15 @@ FUNC(LS_Generic_Door)
 }
 
 FUNC(LS_Floor_LowerByValue)
-// Floor_LowerByValue (tag, speed, height)
+// Floor_LowerByValue (tag, speed, height, change)
 {
-	return EV_DoFloor (DFloor::floorLowerByValue, ln, arg0, SPEED(arg1), FRACUNIT*arg2, -1, 0, false);
+	return EV_DoFloor (DFloor::floorLowerByValue, ln, arg0, SPEED(arg1), FRACUNIT*arg2, -1, CHANGE(arg3), false);
 }
 
 FUNC(LS_Floor_LowerToLowest)
-// Floor_LowerToLowest (tag, speed)
+// Floor_LowerToLowest (tag, speed, change)
 {
-	return EV_DoFloor (DFloor::floorLowerToLowest, ln, arg0, SPEED(arg1), 0, -1, 0, false);
+	return EV_DoFloor (DFloor::floorLowerToLowest, ln, arg0, SPEED(arg1), 0, -1, CHANGE(arg2), false);
 }
 
 FUNC(LS_Floor_LowerToHighest)
@@ -296,28 +324,41 @@ FUNC(LS_Floor_LowerToHighest)
 	return EV_DoFloor (DFloor::floorLowerToHighest, ln, arg0, SPEED(arg1), (arg2-128)*FRACUNIT, -1, 0, false, arg3==1);
 }
 
-FUNC(LS_Floor_LowerToNearest)
-// Floor_LowerToNearest (tag, speed)
+FUNC(LS_Floor_LowerToHighestEE)
+// Floor_LowerToHighest (tag, speed, change)
 {
-	return EV_DoFloor (DFloor::floorLowerToNearest, ln, arg0, SPEED(arg1), 0, -1, 0, false);
+	return EV_DoFloor (DFloor::floorLowerToHighest, ln, arg0, SPEED(arg1), 0, -1, CHANGE(arg2), false);
+}
+
+FUNC(LS_Floor_LowerToNearest)
+// Floor_LowerToNearest (tag, speed, change)
+{
+	return EV_DoFloor (DFloor::floorLowerToNearest, ln, arg0, SPEED(arg1), 0, -1, CHANGE(arg2), false);
 }
 
 FUNC(LS_Floor_RaiseByValue)
-// Floor_RaiseByValue (tag, speed, height)
+// Floor_RaiseByValue (tag, speed, height, change, crush)
 {
-	return EV_DoFloor (DFloor::floorRaiseByValue, ln, arg0, SPEED(arg1), FRACUNIT*arg2, -1, 0, false);
+	return EV_DoFloor (DFloor::floorRaiseByValue, ln, arg0, SPEED(arg1), FRACUNIT*arg2, CRUSH(arg4), CHANGE(arg3), true);
 }
 
 FUNC(LS_Floor_RaiseToHighest)
-// Floor_RaiseToHighest (tag, speed)
+// Floor_RaiseToHighest (tag, speed, change, crush)
 {
-	return EV_DoFloor (DFloor::floorRaiseToHighest, ln, arg0, SPEED(arg1), 0, -1, 0, false);
+	return EV_DoFloor (DFloor::floorRaiseToHighest, ln, arg0, SPEED(arg1), 0, CRUSH(arg3), CHANGE(arg2), true);
 }
 
 FUNC(LS_Floor_RaiseToNearest)
-// Floor_RaiseToNearest (tag, speed)
+// Floor_RaiseToNearest (tag, speed, change, crush)
 {
-	return EV_DoFloor (DFloor::floorRaiseToNearest, ln, arg0, SPEED(arg1), 0, -1, 0, false);
+	return EV_DoFloor (DFloor::floorRaiseToNearest, ln, arg0, SPEED(arg1), 0, CRUSH(arg3), CHANGE(arg2), true);
+}
+
+FUNC(LS_Floor_RaiseToLowest)
+// Floor_RaiseToLowest (tag, change, crush)
+{
+	// This is merely done for completeness as it's a rather pointless addition.
+	return EV_DoFloor (DFloor::floorRaiseToLowest, ln, arg0, 2*FRACUNIT, 0, CRUSH(arg3), CHANGE(arg2), true);
 }
 
 FUNC(LS_Floor_RaiseAndCrush)
@@ -333,15 +374,15 @@ FUNC(LS_Floor_RaiseAndCrushDoom)
 }
 
 FUNC(LS_Floor_RaiseByValueTimes8)
-// FLoor_RaiseByValueTimes8 (tag, speed, height)
+// FLoor_RaiseByValueTimes8 (tag, speed, height, change, crush)
 {
-	return EV_DoFloor (DFloor::floorRaiseByValue, ln, arg0, SPEED(arg1), FRACUNIT*arg2*8, -1, 0, false);
+	return EV_DoFloor (DFloor::floorRaiseByValue, ln, arg0, SPEED(arg1), FRACUNIT*arg2*8, CRUSH(arg4), CHANGE(arg3), true);
 }
 
 FUNC(LS_Floor_LowerByValueTimes8)
-// Floor_LowerByValueTimes8 (tag, speed, height)
+// Floor_LowerByValueTimes8 (tag, speed, height, change)
 {
-	return EV_DoFloor (DFloor::floorLowerByValue, ln, arg0, SPEED(arg1), FRACUNIT*arg2*8, -1, 0, false);
+	return EV_DoFloor (DFloor::floorLowerByValue, ln, arg0, SPEED(arg1), FRACUNIT*arg2*8, -1, CHANGE(arg3), false);
 }
 
 FUNC(LS_Floor_CrushStop)
@@ -351,41 +392,65 @@ FUNC(LS_Floor_CrushStop)
 }
 
 FUNC(LS_Floor_LowerInstant)
-// Floor_LowerInstant (tag, unused, height)
+// Floor_LowerInstant (tag, unused, height, change)
 {
-	return EV_DoFloor (DFloor::floorLowerInstant, ln, arg0, 0, arg2*FRACUNIT*8, -1, 0, false);
+	return EV_DoFloor (DFloor::floorLowerInstant, ln, arg0, 0, arg2*FRACUNIT*8, -1, CHANGE(arg3), false);
 }
 
 FUNC(LS_Floor_RaiseInstant)
-// Floor_RaiseInstant (tag, unused, height)
+// Floor_RaiseInstant (tag, unused, height, change, crush)
 {
-	return EV_DoFloor (DFloor::floorRaiseInstant, ln, arg0, 0, arg2*FRACUNIT*8, -1, 0, false);
+	return EV_DoFloor (DFloor::floorRaiseInstant, ln, arg0, 0, arg2*FRACUNIT*8, CRUSH(arg4), CHANGE(arg3), true);
+}
+
+FUNC(LS_Floor_ToCeilingInstant)
+// Floor_ToCeilingInstant (tag, change, crush)
+{
+	return EV_DoFloor (DFloor::floorLowerToCeiling, ln, arg0, 0, 0, CRUSH(arg2), CHANGE(arg1), true);
 }
 
 FUNC(LS_Floor_MoveToValueTimes8)
-// Floor_MoveToValueTimes8 (tag, speed, height, negative)
+// Floor_MoveToValueTimes8 (tag, speed, height, negative, change)
 {
 	return EV_DoFloor (DFloor::floorMoveToValue, ln, arg0, SPEED(arg1),
-					   arg2*FRACUNIT*8*(arg3?-1:1), -1, 0, false);
+					   arg2*FRACUNIT*8*(arg3?-1:1), -1, CHANGE(arg4), false);
 }
 
 FUNC(LS_Floor_MoveToValue)
-// Floor_MoveToValue (tag, speed, height, negative)
+// Floor_MoveToValue (tag, speed, height, negative, change)
 {
 	return EV_DoFloor (DFloor::floorMoveToValue, ln, arg0, SPEED(arg1),
-					   arg2*FRACUNIT*(arg3?-1:1), -1, 0, false);
+					   arg2*FRACUNIT*(arg3?-1:1), -1, CHANGE(arg4), false);
 }
 
 FUNC(LS_Floor_RaiseToLowestCeiling)
-// Floor_RaiseToLowestCeiling (tag, speed)
+// Floor_RaiseToLowestCeiling (tag, speed, change, crush)
 {
-	return EV_DoFloor (DFloor::floorRaiseToLowestCeiling, ln, arg0, SPEED(arg1), 0, -1, 0, false);
+	return EV_DoFloor (DFloor::floorRaiseToLowestCeiling, ln, arg0, SPEED(arg1), 0, CRUSH(arg3), CHANGE(arg2), true);
+}
+
+FUNC(LS_Floor_LowerToLowestCeiling)
+// Floor_LowerToLowestCeiling (tag, speed, change)
+{
+	return EV_DoFloor (DFloor::floorLowerToLowestCeiling, ln, arg0, SPEED(arg1), 0, -1, CHANGE(arg2), true);
 }
 
 FUNC(LS_Floor_RaiseByTexture)
-// Floor_RaiseByTexture (tag, speed)
+// Floor_RaiseByTexture (tag, speed, change, crush)
 {
-	return EV_DoFloor (DFloor::floorRaiseByTexture, ln, arg0, SPEED(arg1), 0, -1, 0, false);
+	return EV_DoFloor (DFloor::floorRaiseByTexture, ln, arg0, SPEED(arg1), 0, CRUSH(arg3), CHANGE(arg2), true);
+}
+
+FUNC(LS_Floor_LowerByTexture)
+// Floor_LowerByTexture (tag, speed, change, crush)
+{
+	return EV_DoFloor (DFloor::floorLowerByTexture, ln, arg0, SPEED(arg1), 0, -1, CHANGE(arg2), true);
+}
+
+FUNC(LS_Floor_RaiseToCeiling)
+// Floor_RaiseToCeiling (tag, speed, change, crush)
+{
+	return EV_DoFloor (DFloor::floorRaiseToCeiling, ln, arg0, SPEED(arg1), 0, CRUSH(arg3), CHANGE(arg2), true);
 }
 
 FUNC(LS_Floor_RaiseByValueTxTy)
@@ -471,28 +536,28 @@ FUNC(LS_Stairs_BuildDown)
 // Stair_BuildDown (tag, speed, height, delay, reset)
 {
 	return EV_BuildStairs (arg0, DFloor::buildDown, ln,
-						   arg2 * FRACUNIT, SPEED(arg1), TICS(arg3), arg4, 0, 1);
+						   arg2 * FRACUNIT, SPEED(arg1), TICS(arg3), arg4, 0, DFloor::stairUseSpecials);
 }
 
 FUNC(LS_Stairs_BuildUp)
 // Stairs_BuildUp (tag, speed, height, delay, reset)
 {
 	return EV_BuildStairs (arg0, DFloor::buildUp, ln,
-						   arg2 * FRACUNIT, SPEED(arg1), TICS(arg3), arg4, 0, 1);
+						   arg2 * FRACUNIT, SPEED(arg1), TICS(arg3), arg4, 0, DFloor::stairUseSpecials);
 }
 
 FUNC(LS_Stairs_BuildDownSync)
 // Stairs_BuildDownSync (tag, speed, height, reset)
 {
 	return EV_BuildStairs (arg0, DFloor::buildDown, ln,
-						   arg2 * FRACUNIT, SPEED(arg1), 0, arg3, 0, 2);
+						   arg2 * FRACUNIT, SPEED(arg1), 0, arg3, 0, DFloor::stairUseSpecials|DFloor::stairSync);
 }
 
 FUNC(LS_Stairs_BuildUpSync)
 // Stairs_BuildUpSync (tag, speed, height, reset)
 {
 	return EV_BuildStairs (arg0, DFloor::buildUp, ln,
-						   arg2 * FRACUNIT, SPEED(arg1), 0, arg3, 0, 2);
+						   arg2 * FRACUNIT, SPEED(arg1), 0, arg3, 0, DFloor::stairUseSpecials|DFloor::stairSync);
 }
 
 FUNC(LS_Stairs_BuildUpDoom)
@@ -501,6 +566,28 @@ FUNC(LS_Stairs_BuildUpDoom)
 	return EV_BuildStairs (arg0, DFloor::buildUp, ln,
 						   arg2 * FRACUNIT, SPEED(arg1), TICS(arg3), arg4, 0, 0);
 }
+
+FUNC(LS_Stairs_BuildDownDoom)
+// Stair_BuildDownDoom (tag, speed, height, delay, reset)
+{
+	return EV_BuildStairs (arg0, DFloor::buildDown, ln,
+						   arg2 * FRACUNIT, SPEED(arg1), TICS(arg3), arg4, 0, 0);
+}
+
+FUNC(LS_Stairs_BuildDownDoomSync)
+// Stairs_BuildDownDoomSync (tag, speed, height, reset)
+{
+	return EV_BuildStairs (arg0, DFloor::buildDown, ln,
+						   arg2 * FRACUNIT, SPEED(arg1), 0, arg3, 0, DFloor::stairSync);
+}
+
+FUNC(LS_Stairs_BuildUpDoomSync)
+// Stairs_BuildUpDoomSync (tag, speed, height, reset)
+{
+	return EV_BuildStairs (arg0, DFloor::buildUp, ln,
+						   arg2 * FRACUNIT, SPEED(arg1), 0, arg3, 0, DFloor::stairSync);
+}
+
 
 FUNC(LS_Generic_Stairs)
 // Generic_Stairs (tag, speed, step, dir/igntxt, reset)
@@ -535,27 +622,27 @@ FUNC(LS_Pillar_Open)
 }
 
 FUNC(LS_Ceiling_LowerByValue)
-// Ceiling_LowerByValue (tag, speed, height)
+// Ceiling_LowerByValue (tag, speed, height, change, crush)
 {
-	return EV_DoCeiling (DCeiling::ceilLowerByValue, ln, arg0, SPEED(arg1), 0, arg2*FRACUNIT, -1, 0, 0, false);
+	return EV_DoCeiling (DCeiling::ceilLowerByValue, ln, arg0, SPEED(arg1), 0, arg2*FRACUNIT, CRUSH(arg4), 0, CHANGE(arg3), false);
 }
 
 FUNC(LS_Ceiling_RaiseByValue)
-// Ceiling_RaiseByValue (tag, speed, height)
+// Ceiling_RaiseByValue (tag, speed, height, change)
 {
-	return EV_DoCeiling (DCeiling::ceilRaiseByValue, ln, arg0, SPEED(arg1), 0, arg2*FRACUNIT, -1, 0, 0, false);
+	return EV_DoCeiling (DCeiling::ceilRaiseByValue, ln, arg0, SPEED(arg1), 0, arg2*FRACUNIT, CRUSH(arg4), 0, CHANGE(arg3), false);
 }
 
 FUNC(LS_Ceiling_LowerByValueTimes8)
-// Ceiling_LowerByValueTimes8 (tag, speed, height)
+// Ceiling_LowerByValueTimes8 (tag, speed, height, change, crush)
 {
-	return EV_DoCeiling (DCeiling::ceilLowerByValue, ln, arg0, SPEED(arg1), 0, arg2*FRACUNIT*8, -1, 0, 0, false);
+	return EV_DoCeiling (DCeiling::ceilLowerByValue, ln, arg0, SPEED(arg1), 0, arg2*FRACUNIT*8, -1, 0, CHANGE(arg3), false);
 }
 
 FUNC(LS_Ceiling_RaiseByValueTimes8)
-// Ceiling_RaiseByValueTimes8 (tag, speed, height)
+// Ceiling_RaiseByValueTimes8 (tag, speed, height, change)
 {
-	return EV_DoCeiling (DCeiling::ceilRaiseByValue, ln, arg0, SPEED(arg1), 0, arg2*FRACUNIT*8, -1, 0, 0, false);
+	return EV_DoCeiling (DCeiling::ceilRaiseByValue, ln, arg0, SPEED(arg1), 0, arg2*FRACUNIT*8, -1, 0, CHANGE(arg3), false);
 }
 
 FUNC(LS_Ceiling_CrushAndRaise)
@@ -589,35 +676,35 @@ FUNC(LS_Ceiling_CrushRaiseAndStay)
 }
 
 FUNC(LS_Ceiling_MoveToValueTimes8)
-// Ceiling_MoveToValueTimes8 (tag, speed, height, negative)
+// Ceiling_MoveToValueTimes8 (tag, speed, height, negative, change)
 {
 	return EV_DoCeiling (DCeiling::ceilMoveToValue, ln, arg0, SPEED(arg1), 0,
-						 arg2*FRACUNIT*8*((arg3) ? -1 : 1), -1, 0, 0, false);
+						 arg2*FRACUNIT*8*((arg3) ? -1 : 1), -1, 0, CHANGE(arg4), false);
 }
 
 FUNC(LS_Ceiling_MoveToValue)
-// Ceiling_MoveToValue (tag, speed, height, negative)
+// Ceiling_MoveToValue (tag, speed, height, negative, change)
 {
 	return EV_DoCeiling (DCeiling::ceilMoveToValue, ln, arg0, SPEED(arg1), 0,
-						 arg2*FRACUNIT*((arg3) ? -1 : 1), -1, 0, 0, false);
+						 arg2*FRACUNIT*((arg3) ? -1 : 1), -1, 0, CHANGE(arg4), false);
 }
 
 FUNC(LS_Ceiling_LowerToHighestFloor)
-// Ceiling_LowerToHighestFloor (tag, speed)
+// Ceiling_LowerToHighestFloor (tag, speed, change, crush)
 {
-	return EV_DoCeiling (DCeiling::ceilLowerToHighestFloor, ln, arg0, SPEED(arg1), 0, 0, -1, 0, 0, false);
+	return EV_DoCeiling (DCeiling::ceilLowerToHighestFloor, ln, arg0, SPEED(arg1), 0, 0, CRUSH(arg3), 0, CHANGE(arg2), false);
 }
 
 FUNC(LS_Ceiling_LowerInstant)
-// Ceiling_LowerInstant (tag, unused, height)
+// Ceiling_LowerInstant (tag, unused, height, change, crush)
 {
-	return EV_DoCeiling (DCeiling::ceilLowerInstant, ln, arg0, 0, 0, arg2*FRACUNIT*8, -1, 0, 0, false);
+	return EV_DoCeiling (DCeiling::ceilLowerInstant, ln, arg0, 0, 0, arg2*FRACUNIT*8, CRUSH(arg4), 0, CHANGE(arg3), false);
 }
 
 FUNC(LS_Ceiling_RaiseInstant)
-// Ceiling_RaiseInstant (tag, unused, height)
+// Ceiling_RaiseInstant (tag, unused, height, change)
 {
-	return EV_DoCeiling (DCeiling::ceilRaiseInstant, ln, arg0, 0, 0, arg2*FRACUNIT*8, -1, 0, 0, false);
+	return EV_DoCeiling (DCeiling::ceilRaiseInstant, ln, arg0, 0, 0, arg2*FRACUNIT*8, -1, 0, CHANGE(arg3), false);
 }
 
 FUNC(LS_Ceiling_CrushRaiseAndStayA)
@@ -657,21 +744,69 @@ FUNC(LS_Ceiling_CrushAndRaiseSilentDist)
 }
 
 FUNC(LS_Ceiling_RaiseToNearest)
-// Ceiling_RaiseToNearest (tag, speed)
+// Ceiling_RaiseToNearest (tag, speed, change)
 {
-	return EV_DoCeiling (DCeiling::ceilRaiseToNearest, ln, arg0, SPEED(arg1), 0, 0, -1, 0, 0, false);
+	return EV_DoCeiling (DCeiling::ceilRaiseToNearest, ln, arg0, SPEED(arg1), 0, 0, -1, CHANGE(arg2), 0, false);
+}
+
+FUNC(LS_Ceiling_RaiseToHighest)
+// Ceiling_RaiseToHighest (tag, speed, change)
+{
+	return EV_DoCeiling (DCeiling::ceilRaiseToHighest, ln, arg0, SPEED(arg1), 0, 0, -1, CHANGE(arg2), 0, false);
+}
+
+FUNC(LS_Ceiling_RaiseToLowest)
+// Ceiling_RaiseToLowest (tag, speed, change)
+{
+	return EV_DoCeiling (DCeiling::ceilRaiseToLowest, ln, arg0, SPEED(arg1), 0, 0, -1, CHANGE(arg2), 0, false);
+}
+
+FUNC(LS_Ceiling_RaiseToHighestFloor)
+// Ceiling_RaiseToHighestFloor (tag, speed, change)
+{
+	return EV_DoCeiling (DCeiling::ceilRaiseToHighestFloor, ln, arg0, SPEED(arg1), 0, 0, -1, CHANGE(arg2), 0, false);
+}
+
+FUNC(LS_Ceiling_RaiseByTexture)
+// Ceiling_RaiseByTexture (tag, speed, change)
+{
+	return EV_DoCeiling (DCeiling::ceilRaiseByTexture, ln, arg0, SPEED(arg1), 0, 0, -1, CHANGE(arg2), 0, false);
 }
 
 FUNC(LS_Ceiling_LowerToLowest)
-// Ceiling_LowerToLowest (tag, speed)
+// Ceiling_LowerToLowest (tag, speed, change, crush)
 {
-	return EV_DoCeiling (DCeiling::ceilLowerToLowest, ln, arg0, SPEED(arg1), 0, 0, -1, 0, 0, false);
+	return EV_DoCeiling (DCeiling::ceilLowerToLowest, ln, arg0, SPEED(arg1), 0, 0, CRUSH(arg3), 0, CHANGE(arg2), false);
+}
+
+FUNC(LS_Ceiling_LowerToNearest)
+// Ceiling_LowerToNearest (tag, speed, change, crush)
+{
+	return EV_DoCeiling (DCeiling::ceilLowerToNearest, ln, arg0, SPEED(arg1), 0, 0, CRUSH(arg3), 0, CHANGE(arg2), false);
+}
+
+FUNC(LS_Ceiling_ToHighestInstant)
+// Ceiling_ToHighestInstant (tag, change, crush)
+{
+	return EV_DoCeiling (DCeiling::ceilLowerToHighest, ln, arg0, FRACUNIT*2, 0, 0, CRUSH(arg2), 0, CHANGE(arg1), false);
+}
+
+FUNC(LS_Ceiling_ToFloorInstant)
+// Ceiling_ToFloorInstant (tag, change, crush)
+{
+	return EV_DoCeiling (DCeiling::ceilRaiseToFloor, ln, arg0, FRACUNIT*2, 0, 0, CRUSH(arg2), 0, CHANGE(arg1), false);
 }
 
 FUNC(LS_Ceiling_LowerToFloor)
-// Ceiling_LowerToFloor (tag, speed)
+// Ceiling_LowerToFloor (tag, speed, change, crush)
 {
-	return EV_DoCeiling (DCeiling::ceilLowerToFloor, ln, arg0, SPEED(arg1), 0, 0, -1, 0, 0, false);
+	return EV_DoCeiling (DCeiling::ceilLowerToFloor, ln, arg0, SPEED(arg1), 0, 0, CRUSH(arg3), 0, CHANGE(arg4), false);
+}
+
+FUNC(LS_Ceiling_LowerByTexture)
+// Ceiling_LowerByTexture (tag, speed, change, crush)
+{
+	return EV_DoCeiling (DCeiling::ceilLowerByTexture, ln, arg0, SPEED(arg1), 0, 0, CRUSH(arg3), 0, CHANGE(arg4), false);
 }
 
 FUNC(LS_Generic_Ceiling)
@@ -879,19 +1014,38 @@ FUNC(LS_Teleport_NewMap)
 FUNC(LS_Teleport)
 // Teleport (tid, sectortag, bNoSourceFog)
 {
-	return EV_Teleport (arg0, arg1, ln, backSide, it, true, !arg2, false);
+	int flags = TELF_DESTFOG;
+	if (!arg2)
+	{
+		flags |= TELF_SOURCEFOG;
+	}
+	return EV_Teleport (arg0, arg1, ln, backSide, it, flags);
 }
 
 FUNC( LS_Teleport_NoStop )
 // Teleport_NoStop (tid, sectortag, bNoSourceFog)
 {
-	return EV_Teleport( arg0, arg1, ln, backSide, it, true, !arg2, false, false );
+	int flags = TELF_DESTFOG | TELF_KEEPVELOCITY;
+	if (!arg2)
+	{
+		flags |= TELF_SOURCEFOG;
+	}
+	return EV_Teleport( arg0, arg1, ln, backSide, it, flags);
 }
 
 FUNC(LS_Teleport_NoFog)
 // Teleport_NoFog (tid, useang, sectortag, keepheight)
 {
-	return EV_Teleport (arg0, arg2, ln, backSide, it, false, false, !arg1, true, !!arg3);
+	int flags = 0;
+	if (!arg1)
+	{
+		flags |= TELF_KEEPORIENTATION;
+	}
+	if (arg3)
+	{
+		flags |= TELF_KEEPHEIGHT;
+	}
+	return EV_Teleport (arg0, arg2, ln, backSide, it, flags);
 }
 
 FUNC(LS_Teleport_ZombieChanger)
@@ -900,7 +1054,7 @@ FUNC(LS_Teleport_ZombieChanger)
 	// This is practically useless outside of Strife, but oh well.
 	if (it != NULL)
 	{
-		EV_Teleport (arg0, arg1, ln, backSide, it, false, false, false);
+		EV_Teleport (arg0, arg1, ln, backSide, it, 0);
 		if (it->health >= 0) it->SetState (it->FindState(NAME_Pain));
 		return true;
 	}
@@ -1599,6 +1753,11 @@ FUNC(LS_Thing_Move)		// [BC]
 	return P_Thing_Move (arg0, it, arg1, arg2 ? false : true);
 }
 
+enum
+{
+	TRANSLATION_ICE = 0x100007
+};
+
 FUNC(LS_Thing_SetTranslation)
 // Thing_SetTranslation (tid, range)
 {
@@ -1614,6 +1773,10 @@ FUNC(LS_Thing_SetTranslation)
 	else if (arg1 >= 1 && arg1 < MAX_ACS_TRANSLATIONS)
 	{
 		range = TRANSLATION(TRANSLATION_LevelScripted, (arg1-1));
+	}
+	else if (arg1 == TRANSLATION_ICE)
+	{
+		range = TRANSLATION(TRANSLATION_Standard, 7);
 	}
 	else
 	{
@@ -1741,6 +1904,22 @@ FUNC(LS_ACS_Terminate)
 
 	return true;
 }
+
+//==========================================================================
+//
+//
+//
+//==========================================================================
+
+FUNC(LS_FS_Execute)
+// FS_Execute(script#,firstsideonly,lock,msgtype)
+{
+	if (arg1 && ln && backSide) return false;
+	if (arg2!=0 && !P_CheckKeys(it, arg2, !!arg3)) return false;
+	return T_RunScript(arg0,it);
+}
+
+
 
 FUNC(LS_FloorAndCeiling_LowerByValue)
 // FloorAndCeiling_LowerByValue (tag, speed, height)
@@ -1935,6 +2114,9 @@ FUNC(LS_Sector_ChangeFlags)
 
 	rtn = false;
 	FSectorTagIterator itr(arg0);
+	// exclude protected flags
+	arg1 &= ~SECF_NOMODIFY;
+	arg2 &= ~SECF_NOMODIFY;
 	while ((secNum = itr.Next()) >= 0)
 	{
 		sectors[secNum].Flags = (sectors[secNum].Flags | arg1) & ~arg2;
@@ -2236,7 +2418,7 @@ FUNC(LS_PointPush_SetForce)
 }
 
 FUNC(LS_Sector_SetDamage)
-// Sector_SetDamage (tag, amount, mod)
+// Sector_SetDamage (tag, amount, mod, interval, leaky)
 {
 	// The sector still stores the mod in its old format because
 	// adding an FName to the sector_t structure might cause
@@ -2247,8 +2429,28 @@ FUNC(LS_Sector_SetDamage)
 	int secnum;
 	while ((secnum = itr.Next()) >= 0)
 	{
-		sectors[secnum].damage = arg1;
-		sectors[secnum].mod = arg2;
+		if (arg3 <= 0)	// emulate old and hacky method to handle leakiness.
+		{
+			if (arg1 < 20)
+			{
+				arg4 = 0;
+				arg3 = 32;
+			}
+			else if (arg1 < 50)
+			{
+				arg4 = 5;
+				arg3 = 32;
+			}
+			else
+			{
+				arg4 = 256;
+				arg3 = 1;
+			}
+		}
+		sectors[secnum].damageamount = (short)arg1;
+		sectors[secnum].damagetype = MODtoDamageType(arg2);
+		sectors[secnum].damageinterval = (short)arg3;
+		sectors[secnum].leakydamage = (short)arg4;
 	}
 	return true;
 }
@@ -2577,6 +2779,7 @@ FUNC(LS_Line_SetBlocking)
 		ML_BLOCKUSE,
 		ML_BLOCKSIGHT,
 		ML_BLOCKHITSCAN,
+		ML_SOUNDBLOCK,
 		-1
 	};
 
@@ -2701,19 +2904,19 @@ FUNC(LS_SetPlayerProperty)
 	// Add or remove a power
 	if (arg2 >= PROP_INVULNERABILITY && arg2 <= PROP_SPEED)
 	{
-		static const PClass *powers[11] =
+		static PClass * const *powers[11] =
 		{
-			RUNTIME_CLASS(APowerInvulnerable),
-			RUNTIME_CLASS(APowerStrength),
-			RUNTIME_CLASS(APowerInvisibility),
-			RUNTIME_CLASS(APowerIronFeet),
+			&RUNTIME_CLASS_CASTLESS(APowerInvulnerable),
+			&RUNTIME_CLASS_CASTLESS(APowerStrength),
+			&RUNTIME_CLASS_CASTLESS(APowerInvisibility),
+			&RUNTIME_CLASS_CASTLESS(APowerIronFeet),
 			NULL, // MapRevealer
-			RUNTIME_CLASS(APowerLightAmp),
-			RUNTIME_CLASS(APowerWeaponLevel2),
-			RUNTIME_CLASS(APowerFlight),
+			&RUNTIME_CLASS_CASTLESS(APowerLightAmp),
+			&RUNTIME_CLASS_CASTLESS(APowerWeaponLevel2),
+			&RUNTIME_CLASS_CASTLESS(APowerFlight),
 			NULL,
 			NULL,
-			RUNTIME_CLASS(APowerSpeed)
+			&RUNTIME_CLASS_CASTLESS(APowerSpeed)
 		};
 		int power = arg2 - PROP_INVULNERABILITY;
 
@@ -2728,7 +2931,7 @@ FUNC(LS_SetPlayerProperty)
 			{ // Give power to activator
 				if (power != 4)
 				{
-					APowerup *item = static_cast<APowerup*>(it->GiveInventoryType (powers[power]));
+					APowerup *item = static_cast<APowerup*>(it->GiveInventoryType(static_cast<PClassActor *>(*powers[power])));
 					if (item != NULL && power == 0 && arg1 == 1) 
 					{
 						item->BlendColor = MakeSpecialColormap(INVERSECOLORMAP);
@@ -2743,7 +2946,7 @@ FUNC(LS_SetPlayerProperty)
 			{ // Take power from activator
 				if (power != 4)
 				{
-					AInventory *item = it->FindInventory (powers[power], true);
+					AInventory *item = it->FindInventory(static_cast<PClassActor *>(*powers[power]), true);
 					if (item != NULL)
 					{
 						item->Destroy ();
@@ -2768,7 +2971,7 @@ FUNC(LS_SetPlayerProperty)
 				{ // Give power
 					if (power != 4)
 					{
-						APowerup *item = static_cast<APowerup*>(players[i].mo->GiveInventoryType (powers[power]));
+						APowerup *item = static_cast<APowerup*>(players[i].mo->GiveInventoryType (static_cast<PClassActor *>(*powers[power])));
 						if (item != NULL && power == 0 && arg1 == 1) 
 						{
 							item->BlendColor = MakeSpecialColormap(INVERSECOLORMAP);
@@ -2783,7 +2986,7 @@ FUNC(LS_SetPlayerProperty)
 				{ // Take power
 					if (power != 4)
 					{
-						AInventory *item = players[i].mo->FindInventory (powers[power]);
+						AInventory *item = players[i].mo->FindInventory (static_cast<PClassActor *>(*powers[power]));
 						if (item != NULL)
 						{
 							item->Destroy ();
@@ -2985,13 +3188,14 @@ FUNC(LS_SendToCommunicator)
 		{
 			S_StopSound (CHAN_VOICE);
 			S_Sound (CHAN_VOICE, name, 1, ATTN_NORM);
-			if (arg2 == 0)
+
+			// Get the message from the LANGUAGE lump.
+			FString msg;
+			msg.Format("TXT_COMM%d", arg2);
+			const char *str = GStrings[msg];
+			if (str != NULL)
 			{
-				Printf (PRINT_CHAT, "Incoming Message\n");
-			}
-			else if (arg2 == 1)
-			{
-				Printf (PRINT_CHAT, "Incoming Message from BlackBird\n");
+				Printf (PRINT_CHAT, "%s\n", str);
 			}
 		}
 		return true;
@@ -3072,7 +3276,7 @@ FUNC(LS_GlassBreak)
 			{
 				glass = Spawn("GlassJunk", x, y, ONFLOORZ, ALLOW_REPLACE);
 
-				glass->z += 24 * FRACUNIT;
+				glass->AddZ(24 * FRACUNIT);
 				glass->SetState (glass->SpawnState + (pr_glass() % glass->health));
 				an = pr_glass() << (32-8);
 				glass->angle = an;
@@ -3180,7 +3384,7 @@ FUNC(LS_Thing_SetConversation)
 }
 
 
-lnSpecFunc LineSpecials[256] =
+static lnSpecFunc LineSpecials[] =
 {
 	/*   0 */ LS_NOP,
 	/*   1 */ LS_NOP,		// Polyobj_StartLine,
@@ -3287,8 +3491,8 @@ lnSpecFunc LineSpecials[256] =
 	/* 102 */ LS_NOP,		// Scroll_Texture_Up
 	/* 103 */ LS_NOP,		// Scroll_Texture_Down
 	/* 104 */ LS_Ceiling_CrushAndRaiseSilentDist,
-	/* 105 */ LS_NOP,
-	/* 106 */ LS_NOP,
+	/* 105 */ LS_Door_WaitRaise,
+	/* 106 */ LS_Door_WaitClose,
 	/* 107 */ LS_NOP,
 	/* 108 */ LS_NOP,
 	/* 109 */ LS_Light_ForceLightning,
@@ -3340,7 +3544,7 @@ lnSpecFunc LineSpecials[256] =
 	/* 155 */ LS_NOP,
 	/* 156 */ LS_NOP,
 	/* 157 */ LS_NOP,		// SetGlobalFogParameter // in GZDoom
-	/* 158 */ LS_NOP,		// FS_Execute
+	/* 158 */ LS_FS_Execute,
 	/* 159 */ LS_NOP,		// Sector_SetPlaneReflection in GZDoom
 	/* 160 */ LS_NOP,		// Sector_Set3DFloor
 	/* 161 */ LS_NOP,		// Sector_SetContents
@@ -3437,24 +3641,56 @@ lnSpecFunc LineSpecials[256] =
 	/* 252 */ LS_Ceiling_RaiseToNearest,
 	/* 253 */ LS_Ceiling_LowerToLowest,
 	/* 254 */ LS_Ceiling_LowerToFloor,
-	/* 255 */ LS_Ceiling_CrushRaiseAndStaySilA
+	/* 255 */ LS_Ceiling_CrushRaiseAndStaySilA,
+
+	/* 256 */ LS_Floor_LowerToHighestEE,
+	/* 257 */ LS_Floor_RaiseToLowest,
+	/* 258 */ LS_Floor_LowerToLowestCeiling,
+	/* 259 */ LS_Floor_RaiseToCeiling,
+	/* 260 */ LS_Floor_ToCeilingInstant,
+	/* 261 */ LS_Floor_LowerByTexture,
+	/* 262 */ LS_Ceiling_RaiseToHighest,
+	/* 263 */ LS_Ceiling_ToHighestInstant,
+	/* 264 */ LS_Ceiling_LowerToNearest,
+	/* 265 */ LS_Ceiling_RaiseToLowest,
+	/* 266 */ LS_Ceiling_RaiseToHighestFloor,
+	/* 267 */ LS_Ceiling_ToFloorInstant,
+	/* 268 */ LS_Ceiling_RaiseByTexture,
+	/* 269 */ LS_Ceiling_LowerByTexture,
+	/* 270 */ LS_Stairs_BuildDownDoom,
+	/* 271 */ LS_Stairs_BuildUpDoomSync,
+	/* 272 */ LS_Stairs_BuildDownDoomSync,
+
 };
 
 #define DEFINE_SPECIAL(name, num, min, max, mmax) {#name, num, min, max, mmax},
 static FLineSpecial LineSpecialNames[] = {
 #include "actionspecials.h"
 };
-const FLineSpecial *LineSpecialsInfo[256];
 
 static int STACK_ARGS lscmp (const void * a, const void * b)
 {
 	return stricmp( ((FLineSpecial*)a)->name, ((FLineSpecial*)b)->name);
 }
 
-static struct InitLineSpecials
+static struct LineSpecialTable
 {
-	InitLineSpecials()
+	TArray<FLineSpecial *> LineSpecialsInfo;
+
+	LineSpecialTable()
 	{
+		unsigned int max = 0;
+		for (size_t i = 0; i < countof(LineSpecialNames); ++i)
+		{
+			if (LineSpecialNames[i].number > (int)max)
+				max = LineSpecialNames[i].number;
+		}
+		LineSpecialsInfo.Resize(max + 1);
+		for (unsigned i = 0; i <= max; i++)
+		{
+			LineSpecialsInfo[i] = NULL;
+		}
+
 		qsort(LineSpecialNames, countof(LineSpecialNames), sizeof(FLineSpecial), lscmp);
 		for (size_t i = 0; i < countof(LineSpecialNames); ++i)
 		{
@@ -3462,7 +3698,33 @@ static struct InitLineSpecials
 			LineSpecialsInfo[LineSpecialNames[i].number] = &LineSpecialNames[i];
 		}
 	}
-} DoInit;
+} LineSpec;
+
+//==========================================================================
+//
+//
+//
+//==========================================================================
+
+int P_GetMaxLineSpecial()
+{
+	return LineSpec.LineSpecialsInfo.Size() - 1;
+}
+
+//==========================================================================
+//
+//
+//
+//==========================================================================
+
+FLineSpecial *P_GetLineSpecialInfo(int special)
+{
+	if ((unsigned) special < LineSpec.LineSpecialsInfo.Size())
+	{
+		return LineSpec.LineSpecialsInfo[special];
+	}
+	return NULL;
+}
 
 //==========================================================================
 //
@@ -3515,7 +3777,7 @@ int P_ExecuteSpecial(int			num,
 					 int			arg4,
 					 int			arg5)
 {
-	if (num >= 0 && num <= 255)
+	if (num >= 0 && num < countof(LineSpecials))
 	{
 		return LineSpecials[num](line, activator, backSide, arg1, arg2, arg3, arg4, arg5);
 	}

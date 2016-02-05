@@ -37,7 +37,7 @@
 #include "s_sound.h"
 #include "textures/textures.h"
 
-struct PClass;
+class PClass;
 
 extern WORD DefaultTerrainType;
 
@@ -89,9 +89,9 @@ struct FSplashDef
 	FName Name;
 	FSoundID SmallSplashSound;
 	FSoundID NormalSplashSound;
-	const PClass *SmallSplash;
-	const PClass *SplashBase;
-	const PClass *SplashChunk;
+	PClassActor *SmallSplash;
+	PClassActor *SplashBase;
+	PClassActor *SplashChunk;
 	BYTE ChunkXVelShift;
 	BYTE ChunkYVelShift;
 	BYTE ChunkZVelShift;
@@ -121,5 +121,9 @@ struct FTerrainDef
 
 extern TArray<FSplashDef> Splashes;
 extern TArray<FTerrainDef> Terrains;
+
+class FArchive;
+int P_FindTerrain(FName name);
+void P_SerializeTerrain(FArchive &arc, int &terrainnum);
 
 #endif //__P_TERRAIN_H__

@@ -187,6 +187,7 @@ else( WIN32 )
 			if( GTK2_FOUND )
 				set( ZDOOM_LIBS ${ZDOOM_LIBS} ${GTK2_LIBRARIES} )
 				include_directories( ${GTK2_INCLUDE_DIRS} )
+				link_directories( ${GTK2_LIBRARY_DIRS} )
 			else( GTK2_FOUND )
 				set( NO_GTK ON )
 			endif( GTK2_FOUND )
@@ -285,15 +286,18 @@ if( NO_FMOD )
 endif( NO_FMOD )
 if( NO_OPENAL )
 	add_definitions( -DNO_OPENAL=1 )
+
+	set(MPG123_FOUND NO)
+	set(SNDFILE_FOUND NO)
+else( NO_OPENAL )
+	# Search for libSndFile
+
+	find_package( SndFile )
+
+	# Search for libmpg123
+
+	find_package( MPG123 )
 endif( NO_OPENAL )
-
-# Search for libSndFile
-
-find_package( SndFile )
-
-# Search for libmpg123
-
-find_package( MPG123 )
 
 # Search for FluidSynth
 
@@ -455,6 +459,11 @@ if( ZD_CMAKE_COMPILER_IS_GNUCXX_COMPATIBLE )
 	set( CMAKE_CXX_FLAGS_MINSIZEREL "${REL_CXX_FLAGS} ${CMAKE_CXX_FLAGS_MINSIZEREL}" )
 	set( CMAKE_CXX_FLAGS_RELWITHDEBINFO "${REL_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}" )
 
+	if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER "4.5")
+                set( CMAKE_C_FLAGS "-Wno-unused-result ${CMAKE_C_FLAGS}" )
+		set( CMAKE_CXX_FLAGS "-Wno-unused-result ${CMAKE_CXX_FLAGS}" )
+        endif(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER "4.5")
+	set( CMAKE_C_FLAGS "-Wall -Wextra -Wno-unused -Wno-unused-parameter -Wno-missing-field-initializers ${CMAKE_C_FLAGS}" )
 	set( CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused -Wno-unused-parameter -Wno-missing-field-initializers ${CMAKE_CXX_FLAGS}" )
 
 	# Remove extra warnings when using the official DirectX headers.
@@ -495,6 +504,11 @@ endif( NOT STRNICMP_EXISTS )
 if( NOT MSVC )
 	add_definitions( -D__forceinline=inline )
 endif( NOT MSVC )
+
+# Fix stat in v140_xp (broken in RTM and Update 1 so far)
+if( MSVC AND MSVC_VERSION EQUAL 1900 AND CMAKE_GENERATOR_TOOLSET STREQUAL "v140_xp" )
+	add_definitions( -D_stat64i32=VS14Stat )
+endif( MSVC AND MSVC_VERSION EQUAL 1900 AND CMAKE_GENERATOR_TOOLSET STREQUAL "v140_xp" )
 
 if( UNIX )
 	CHECK_LIBRARY_EXISTS( rt clock_gettime "" CLOCK_GETTIME_IN_RT )
@@ -585,9 +599,7 @@ set( PLAT_WIN32_SOURCES
 set( PLAT_POSIX_SOURCES
 	posix/i_cd.cpp
 	posix/i_movie.cpp
-	posix/i_steam.cpp
-	posix/i_system.cpp
-	posix/st_start.cpp )
+	posix/i_steam.cpp )
 set( PLAT_SDL_SOURCES
 	posix/sdl/crashcatcher.c
 	posix/sdl/hardware.cpp
@@ -595,8 +607,10 @@ set( PLAT_SDL_SOURCES
 	posix/sdl/i_input.cpp
 	posix/sdl/i_joystick.cpp
 	posix/sdl/i_main.cpp
+	posix/sdl/i_system.cpp
 	posix/sdl/i_timer.cpp
-	posix/sdl/sdlvideo.cpp )
+	posix/sdl/sdlvideo.cpp
+	posix/sdl/st_start.cpp )
 set( PLAT_OSX_SOURCES
 	posix/osx/iwadpicker_cocoa.mm
 	posix/osx/zdoom.icns )
@@ -605,8 +619,11 @@ set( PLAT_COCOA_SOURCES
 	posix/cocoa/i_input.mm
 	posix/cocoa/i_joystick.cpp
 	posix/cocoa/i_main.mm
+	posix/cocoa/i_system.mm
 	posix/cocoa/i_timer.cpp
-	posix/cocoa/i_video.mm )
+	posix/cocoa/i_video.mm
+	posix/cocoa/st_console.mm
+	posix/cocoa/st_start.mm )
 
 if( WIN32 )
 	set( SYSTEM_SOURCES_DIR win32 )
@@ -667,6 +684,12 @@ add_custom_command( OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xlat_parser.c ${CMAKE_CUR
 	COMMAND lemon xlat_parser.y
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	DEPENDS lemon ${CMAKE_CURRENT_SOURCE_DIR}/xlat/xlat_parser.y )
+
+add_custom_command( OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/zcc-parse.c ${CMAKE_CURRENT_BINARY_DIR}/zcc-parse.h
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/zscript/zcc-parse.lemon .
+	COMMAND lemon zcc-parse.lemon
+	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+	DEPENDS lemon ${CMAKE_CURRENT_SOURCE_DIR}/zscript/zcc-parse.lemon )
 
 add_custom_command( OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sc_man_scanner.h
 	COMMAND re2c --no-generation-date -s -o ${CMAKE_CURRENT_BINARY_DIR}/sc_man_scanner.h ${CMAKE_CURRENT_SOURCE_DIR}/sc_man_scanner.re
@@ -734,6 +757,7 @@ file( GLOB HEADER_FILES
 	textures/*.h
 	thingdef/*.h
 	xlat/*.h
+	zscript/*.h
 	*.h
 )
 
@@ -820,6 +844,9 @@ set( NOT_COMPILED_SOURCE_FILES
 	xlat/xlat_parser.y
 	xlat_parser.c
 	xlat_parser.h
+	zscript/zcc-parse.lemon
+	zcc-parse.c
+	zcc-parse.h
 
 	# We could have the ASM macro add these files, but it wouldn't add all
 	# platforms.
@@ -909,6 +936,7 @@ add_executable( zdoom WIN32 MACOSX_BUNDLE
 	nodebuild_extract.cpp
 	nodebuild_gl.cpp
 	nodebuild_utility.cpp
+	pathexpander.cpp
 	p_3dfloors.cpp
 	p_3dmidtex.cpp
 	p_acs.cpp
@@ -988,6 +1016,8 @@ add_executable( zdoom WIN32 MACOSX_BUNDLE
 	wi_stuff.cpp
 	zstrformat.cpp
 	zstring.cpp
+	GuillotineBinPack.cpp
+	SkylineBinPack.cpp
 	g_doom/a_doommisc.cpp
 	g_heretic/a_hereticmisc.cpp
 	g_hexen/a_hexenmisc.cpp
@@ -1085,6 +1115,7 @@ add_executable( zdoom WIN32 MACOSX_BUNDLE
 	sound/music_fluidsynth_mididevice.cpp
 	sound/music_softsynth_mididevice.cpp
 	sound/music_timidity_mididevice.cpp
+	sound/music_wildmidi_mididevice.cpp
 	sound/music_win_mididevice.cpp
 	sound/oalsound.cpp
 	sound/sndfile_decoder.cpp
@@ -1115,7 +1146,6 @@ add_executable( zdoom WIN32 MACOSX_BUNDLE
 	thingdef/thingdef_data.cpp
 	thingdef/thingdef_exp.cpp
 	thingdef/thingdef_expression.cpp
-	thingdef/thingdef_function.cpp
 	thingdef/thingdef_parse.cpp
 	thingdef/thingdef_properties.cpp
 	thingdef/thingdef_states.cpp
@@ -1128,6 +1158,11 @@ add_executable( zdoom WIN32 MACOSX_BUNDLE
 	timidity/playmidi.cpp
 	timidity/resample.cpp
 	timidity/timidity.cpp
+	wildmidi/file_io.cpp
+	wildmidi/gus_pat.cpp
+	wildmidi/reverb.cpp
+	wildmidi/wildmidi_lib.cpp
+	wildmidi/wm_error.cpp
 	xlat/parse_xlat.cpp
 	fragglescript/t_fspic.cpp
 	fragglescript/t_func.cpp
@@ -1145,6 +1180,14 @@ add_executable( zdoom WIN32 MACOSX_BUNDLE
 	r_data/renderstyle.cpp
 	r_data/r_interpolate.cpp
 	r_data/r_translate.cpp
+	zscript/ast.cpp
+	zscript/vmbuilder.cpp
+	zscript/vmdisasm.cpp
+	zscript/vmexec.cpp
+	zscript/vmframe.cpp
+	zscript/zcc_compile.cpp
+	zscript/zcc_expr.cpp
+	zscript/zcc_parser.cpp
 	zzautozend.cpp
 )
 
@@ -1171,6 +1214,7 @@ include_directories( .
 	thingdef
 	timidity
 	xlat
+	zscript
 	../gdtoa
 	../dumb/include
 	${CMAKE_BINARY_DIR}/gdtoa
@@ -1265,6 +1309,8 @@ source_group("Audio Files\\OPL Synth" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURC
 source_group("Audio Files\\OPL Synth\\DOSBox" FILES oplsynth/dosbox/opl.cpp oplsynth/dosbox/opl.h)
 source_group("Audio Files\\Timidity\\Headers" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/timidity/.+\\.h$")
 source_group("Audio Files\\Timidity\\Source" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/timidity/.+\\.cpp$")
+source_group("Audio Files\\WildMidi\\Headers" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/wildmidi/.+\\.h$")
+source_group("Audio Files\\WildMidi\\Source" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/wildmidi/.+\\.cpp$")
 source_group("Decorate++" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/thingdef/.+")
 source_group("FraggleScript" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/fragglescript/.+")
 source_group("Games\\Doom Game" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/g_doom/.+")
@@ -1290,4 +1336,5 @@ source_group("Shared Game" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/g_sh
 source_group("Versioning" FILES version.h win32/zdoom.rc)
 source_group("Win32 Files" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/win32/.+")
 source_group("Xlat" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/xlat/.+" FILES ${CMAKE_CURRENT_BINARY_DIR}/xlat_parser.c ${CMAKE_CURRENT_BINARY_DIR}/xlat_parser.h)
+source_group("ZScript" REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/zscript/.+")
 source_group("Source Files" FILES ${CMAKE_CURRENT_BINARY_DIR}/sc_man_scanner.h sc_man_scanner.re)

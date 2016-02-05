@@ -72,7 +72,7 @@ bool APowerupGiver::Use (bool pickup)
 		power->Strength = Strength;
 	}
 
-	power->ItemFlags |= ItemFlags & (IF_ALWAYSPICKUP|IF_ADDITIVETIME);
+	power->ItemFlags |= ItemFlags & (IF_ALWAYSPICKUP|IF_ADDITIVETIME|IF_NOTELEPORTFREEZE);
 	if (power->CallTryPickup (Owner))
 	{
 		return true;
@@ -342,6 +342,18 @@ void APowerup::OwnerDied ()
 	Destroy ();
 }
 
+//===========================================================================
+//
+// AInventory :: GetNoTeleportFreeze
+//
+//===========================================================================
+
+bool APowerup::GetNoTeleportFreeze ()
+{
+	if (ItemFlags & IF_NOTELEPORTFREEZE) return true;
+	return Super::GetNoTeleportFreeze();
+}
+
 // Invulnerability Powerup ---------------------------------------------------
 
 IMPLEMENT_CLASS (APowerInvulnerable)
@@ -357,9 +369,9 @@ void APowerInvulnerable::InitEffect ()
 	Super::InitEffect();
 	Owner->effects &= ~FX_RESPAWNINVUL;
 	Owner->flags2 |= MF2_INVULNERABLE;
-	if (Mode == NAME_None)
+	if (Mode == NAME_None && Owner->IsKindOf(RUNTIME_CLASS(APlayerPawn)))
 	{
-		Mode = (ENamedName)RUNTIME_TYPE(Owner)->Meta.GetMetaInt(APMETA_InvulMode);
+		Mode = static_cast<PClassPlayerPawn *>(Owner->GetClass())->InvulMode;
 	}
 	if (Mode == NAME_Reflective)
 	{
@@ -953,7 +965,7 @@ void APowerFlight::InitEffect ()
 	Super::InitEffect();
 	Owner->flags2 |= MF2_FLY;
 	Owner->flags |= MF_NOGRAVITY;
-	if (Owner->z <= Owner->floorz)
+	if (Owner->Z() <= Owner->floorz)
 	{
 		Owner->velz = 4*FRACUNIT;	// thrust the player in the air a bit
 	}
@@ -1000,7 +1012,7 @@ void APowerFlight::EndEffect ()
 
 	if (!(Owner->flags7 & MF7_FLYCHEAT))
 	{
-		if (Owner->z != Owner->floorz)
+		if (Owner->Z() != Owner->floorz)
 		{
 			Owner->player->centering = true;
 		}
@@ -1238,7 +1250,7 @@ void APowerSpeed::DoEffect ()
 	if (P_AproxDistance (Owner->velx, Owner->vely) <= 12*FRACUNIT)
 		return;
 
-	AActor *speedMo = Spawn<APlayerSpeedTrail> (Owner->x, Owner->y, Owner->z, NO_REPLACE);
+	AActor *speedMo = Spawn<APlayerSpeedTrail> (Owner->Pos(), NO_REPLACE);
 	if (speedMo)
 	{
 		speedMo->angle = Owner->angle;
@@ -1488,7 +1500,9 @@ void APowerTimeFreezer::InitEffect()
 	}
 	else
 	{
-		EffectTics++;
+		// Compensate for skipped tic, but beware of overflow.
+		if(EffectTics < INT_MAX)
+			EffectTics++;
 	}
 }
 
@@ -1605,8 +1619,8 @@ void APowerDamage::ModifyDamage(int damage, FName damageType, int &newdamage, bo
 	static const fixed_t def = 4*FRACUNIT;
 	if (!passive && damage > 0)
 	{
-		const fixed_t * pdf = NULL;
-		DmgFactors * df = GetClass()->ActorInfo->DamageFactors;
+		const fixed_t *pdf = NULL;
+		DmgFactors *df = GetClass()->DamageFactors;
 		if (df != NULL && df->CountUsed() != 0)
 		{
 			pdf = df->CheckFactor(damageType);
@@ -1686,7 +1700,7 @@ void APowerProtection::ModifyDamage(int damage, FName damageType, int &newdamage
 	if (passive && damage > 0)
 	{
 		const fixed_t *pdf = NULL;
-		DmgFactors *df = GetClass()->ActorInfo->DamageFactors;
+		DmgFactors *df = GetClass()->DamageFactors;
 		if (df != NULL && df->CountUsed() != 0)
 		{
 			pdf = df->CheckFactor(damageType);
@@ -1873,9 +1887,9 @@ void APowerMorph::InitEffect( )
 	if (Owner != NULL && Owner->player != NULL && PlayerClass != NAME_None)
 	{
 		player_t *realplayer = Owner->player;	// Remember the identity of the player
-		const PClass *morph_flash = PClass::FindClass (MorphFlash);
-		const PClass *unmorph_flash = PClass::FindClass (UnMorphFlash);
-		const PClass *player_class = PClass::FindClass (PlayerClass);
+		PClassActor *morph_flash = PClass::FindActor(MorphFlash);
+		PClassActor *unmorph_flash = PClass::FindActor(UnMorphFlash);
+		PClassPlayerPawn *player_class = dyn_cast<PClassPlayerPawn>(PClass::FindClass (PlayerClass));
 		if (P_MorphPlayer(realplayer, realplayer, player_class, -1/*INDEFINITELY*/, MorphStyle, morph_flash, unmorph_flash))
 		{
 			Owner = realplayer->mo;				// Replace the new owner in our owner; safe because we are not attached to anything yet

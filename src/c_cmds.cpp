@@ -30,8 +30,6 @@
 ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **---------------------------------------------------------------------------
 **
-** It might be a good idea to move these into files that they are more
-** closely related to, but right now, I am too lazy to do that.
 */
 
 #include <math.h>
@@ -422,7 +420,7 @@ CCMD (take)
 
 CCMD (gameversion)
 {
-	Printf ("%s @ %s\nCommit %s", GetVersionString(), GetGitTime(), GetGitHash());
+	Printf ("%s @ %s\nCommit %s\n", GetVersionString(), GetGitTime(), GetGitHash());
 }
 
 CCMD (print)
@@ -605,7 +603,7 @@ CCMD (special)
 			}
 		}
 		Net_WriteByte(DEM_RUNSPECIAL);
-		Net_WriteByte(specnum);
+		Net_WriteWord(specnum);
 		Net_WriteByte(argc - 2);
 		for (int i = 2; i < argc; ++i)
 		{
@@ -929,8 +927,8 @@ static void PrintFilteredActorList(const ActorTypeChecker IsActorType, const cha
 
 	if (FilterName != NULL)
 	{
-		FilterClass = PClass::FindClass(FilterName);
-		if (FilterClass == NULL || FilterClass->ActorInfo == NULL)
+		FilterClass = PClass::FindActor(FilterName);
+		if (FilterClass == NULL)
 		{
 			Printf("%s is not an actor class.\n", FilterName);
 			return;
@@ -944,7 +942,7 @@ static void PrintFilteredActorList(const ActorTypeChecker IsActorType, const cha
 		{
 			Printf ("%s at (%d,%d,%d)\n",
 				mo->GetClass()->TypeName.GetChars(),
-				mo->x >> FRACBITS, mo->y >> FRACBITS, mo->z >> FRACBITS);
+				mo->X() >> FRACBITS, mo->Y() >> FRACBITS, mo->Z() >> FRACBITS);
 		}
 	}
 }
@@ -1083,8 +1081,43 @@ CCMD(nextsecret)
 CCMD(currentpos)
 {
 	AActor *mo = players[consoleplayer].mo;
-	Printf("Current player position: (%1.3f,%1.3f,%1.3f), angle: %1.3f, floorheight: %1.3f, sector:%d, lightlevel: %d\n",
-		FIXED2FLOAT(mo->x), FIXED2FLOAT(mo->y), FIXED2FLOAT(mo->z), mo->angle/float(ANGLE_1), FIXED2FLOAT(mo->floorz), mo->Sector->sectornum, mo->Sector->lightlevel);
+	if(mo)
+	{
+		Printf("Current player position: (%1.3f,%1.3f,%1.3f), angle: %1.3f, floorheight: %1.3f, sector:%d, lightlevel: %d\n",
+			FIXED2FLOAT(mo->X()), FIXED2FLOAT(mo->Y()), FIXED2FLOAT(mo->Z()), mo->angle/float(ANGLE_1), FIXED2FLOAT(mo->floorz), mo->Sector->sectornum, mo->Sector->lightlevel);
+	}
+	else
+	{
+		Printf("You are not in game!");
+	}
+}
+
+//-----------------------------------------------------------------------------
+//
+//
+//
+//-----------------------------------------------------------------------------
+CCMD(vmengine)
+{
+	if (argv.argc() == 2)
+	{
+		if (stricmp(argv[1], "default") == 0)
+		{
+			VMSelectEngine(VMEngine_Default);
+			return;
+		}
+		else if (stricmp(argv[1], "checked") == 0)
+		{
+			VMSelectEngine(VMEngine_Checked);
+			return;
+		}
+		else if (stricmp(argv[1], "unchecked") == 0)
+		{
+			VMSelectEngine(VMEngine_Unchecked);
+			return;
+		}
+	}
+	Printf("Usage: vmengine <default|checked|unchecked>\n");
 }
 
 //-----------------------------------------------------------------------------
@@ -1106,11 +1139,8 @@ static void PrintSecretString(const char *string, bool thislevel)
 				if (*string == ';') string++;
 				if (thislevel && secnum >= 0 && secnum < numsectors)
 				{
-					if (sectors[secnum].secretsector)
-					{
-						if ((sectors[secnum].special & SECRET_MASK)) colstr = TEXTCOLOR_RED;
-						else colstr = TEXTCOLOR_GREEN;
-					}
+					if (sectors[secnum].isSecret()) colstr = TEXTCOLOR_RED;
+					else if (sectors[secnum].wasSecret()) colstr = TEXTCOLOR_GREEN;
 					else colstr = TEXTCOLOR_ORANGE;
 				}
 			}
