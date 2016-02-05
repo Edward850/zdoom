@@ -151,8 +151,8 @@ struct FUDMFKey
 	FUDMFKey& operator =(const FString &val)
 	{
 		Type = UDMF_String;
-		IntVal = strtol(val, NULL, 0);
-		FloatVal = strtod(val, NULL);
+		IntVal = strtol(val.GetChars(), NULL, 0);
+		FloatVal = strtod(val.GetChars(), NULL);
 		StringVal = val;
 		return *this;
 	}
@@ -336,6 +336,13 @@ enum
 	PLANEF_ABSLIGHTING	= 1,	// floor/ceiling light is absolute, not relative
 	PLANEF_BLOCKED		= 2,	// can not be moved anymore.
 	PLANEF_ADDITIVE		= 4,	// rendered additive
+
+	// linked portal stuff
+	PLANEF_NORENDER		= 8,
+	PLANEF_NOPASS		= 16,
+	PLANEF_BLOCKSOUND	= 32,
+	PLANEF_DISABLED		= 64,
+	PLANEF_OBSTRUCTED	= 128,	// if the portal plane is beyond the sector's floor or ceiling.
 };
 
 // Internal sector flags
@@ -988,15 +995,14 @@ struct line_t
 	sector_t	*frontsector, *backsector;
 	int 		validcount;	// if == validcount, already checked
 	int			locknumber;	// [Dusk] lock number for special
-	line_t		*portal_dst;
-	bool		portal;
-	bool		portal_mirror;
-	bool		portal_passive;
+	unsigned	portalindex;
 
-	bool isLinePortal() const
-	{
-		return portal;
-	}
+	// returns true if the portal is crossable by actors
+	bool isLinePortal() const;
+	// returns true if the portal needs to be handled by the renderer
+	bool isVisualPortal() const;
+	line_t *getPortalDestination() const;
+	int getPortalAlignment() const;
 };
 
 // phares 3/14/98

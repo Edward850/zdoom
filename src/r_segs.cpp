@@ -68,6 +68,9 @@ CVAR(Bool, r_np2, true, 0)
 
 extern fixed_t globaluclip, globaldclip;
 
+PortalDrawseg* CurrentPortal = NULL;
+int CurrentPortalUniq = 0;
+bool CurrentPortalInSkybox = false;
 
 // OPTIMIZE: closed two sided lines as single sided
 
@@ -522,7 +525,7 @@ void R_RenderMaskedSegRange (drawseg_t *ds, int x1, int x2)
 					wallupper[i] = mceilingclip[i];
 			}
 			mceilingclip = wallupper;
-		}			
+		}
 		if (fake3D & FAKE3D_CLIPBOTTOM)
 		{
 			OWallMost(walllower, sclipBottom - viewz, &WallC);
@@ -2017,8 +2020,7 @@ void R_NewWall (bool needlights)
 	midtexture = toptexture = bottomtexture = 0;
 
 	if (sidedef == linedef->sidedef[0] &&
-		linedef->portal &&
-		(!linedef->portal_mirror || r_drawmirrors)) // [ZZ] compatibility with r_drawmirrors cvar that existed way before portals
+		(linedef->isVisualPortal() || (linedef->special == Line_Mirror && r_drawmirrors))) // [ZZ] compatibility with r_drawmirrors cvar that existed way before portals
 	{
 		markfloor = markceiling = true; // act like an one-sided wall here (todo: check how does this work with transparency)
 		rw_markportal = true;
@@ -2645,7 +2647,7 @@ void R_StoreWallRange (int start, int stop)
 	{
 		PortalDrawseg pds;
 		pds.src = curline->linedef;
-		pds.dst = curline->linedef->portal_dst;
+		pds.dst = curline->linedef->special == Line_Mirror? curline->linedef : curline->linedef->getPortalDestination();
 		pds.x1 = ds_p->x1;
 		pds.x2 = ds_p->x2;
 		pds.len = pds.x2 - pds.x1;
@@ -2666,7 +2668,7 @@ void R_StoreWallRange (int start, int stop)
 				pds.floorclip[i] = RenderTarget->GetHeight()-1;
 		}
 
-		pds.mirror = curline->linedef->portal_mirror;
+		pds.mirror = curline->linedef->special == Line_Mirror;
 		WallPortals.Push(pds);
 	}
 
@@ -2777,11 +2779,6 @@ int OWallMost (short *mostbuf, fixed_t z, const FWallCoords *wallc)
 	}
 #endif
 #endif
-	if (mostbuf[ix1] < 0) mostbuf[ix1] = 0;
-	else if (mostbuf[ix1] > viewheight) mostbuf[ix1] = (short)viewheight;
-	if (mostbuf[ix2-1] < 0) mostbuf[ix2-1] = 0;
-	else if (mostbuf[ix2-1] > viewheight) mostbuf[ix2-1] = (short)viewheight;
-
 	return bad;
 }
 
@@ -2934,11 +2931,6 @@ int WallMost (short *mostbuf, const secplane_t &plane, const FWallCoords *wallc)
 		fixed_t yinc = (Scale (z2>>4, InvZtoScale, iy2) - y) / (ix2-ix1);
 		qinterpolatedown16short (&mostbuf[ix1], ix2-ix1, y + centeryfrac,yinc);
 	}
-
-	if (mostbuf[ix1] < 0) mostbuf[ix1] = 0;
-	else if (mostbuf[ix1] > viewheight) mostbuf[ix1] = (short)viewheight;
-	if (mostbuf[ix2-1] < 0) mostbuf[ix2-1] = 0;
-	else if (mostbuf[ix2-1] > viewheight) mostbuf[ix2-1] = (short)viewheight;
 
 	return bad;
 }

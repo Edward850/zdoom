@@ -54,6 +54,7 @@
 #include "decallib.h"
 #include "m_random.h"
 #include "i_system.h"
+#include "m_argv.h"
 #include "p_local.h"
 #include "doomerrors.h"
 #include "a_hexenglobal.h"
@@ -279,12 +280,10 @@ static void FinishThingdef()
 	int errorcount = 0;
 	unsigned i;
 	int codesize = 0;
-
-#if 1
-	FILE *dump = fopen("disasm.txt", "w");
-#else
 	FILE *dump = NULL;
-#endif
+
+	if (Args->CheckParm("-dumpdisasm")) dump = fopen("disasm.txt", "w");
+
 	for (i = 0; i < StateTempCalls.Size(); ++i)
 	{
 		FStateTempCall *tcall = StateTempCalls[i];

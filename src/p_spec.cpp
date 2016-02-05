@@ -64,6 +64,10 @@
 #include "a_keys.h"
 #include "c_dispatch.h"
 #include "r_sky.h"
+#include "portal.h"
+#ifndef NO_EDATA
+#include "edata.h"
+#endif
 
 // State.
 #include "r_state.h"
@@ -1323,6 +1327,11 @@ void P_SpawnSpecials (void)
 
 		P_InitSectorSpecial(sector, sector->special, false);
 	}
+
+#ifndef NO_EDATA
+	ProcessEDSectors();
+#endif
+
 	
 	// Init other misc stuff
 
@@ -1428,6 +1437,10 @@ void P_SpawnSpecials (void)
 			}
 			break;
 
+		case Line_SetPortal:
+			P_SpawnLinePortal(&lines[i]);
+			break;
+
 		// [RH] ZDoom Static_Init settings
 		case Static_Init:
 			switch (lines[i].args[1])
@@ -1499,6 +1512,7 @@ void P_SpawnSpecials (void)
 	}
 	// [RH] Start running any open scripts on this map
 	FBehavior::StaticStartTypedScripts (SCRIPT_Open, NULL, false);
+	P_FinalizePortals();
 }
 
 // killough 2/28/98:
